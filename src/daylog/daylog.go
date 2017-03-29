@@ -5,11 +5,16 @@ import (
 	"flag"
 	"fmt"
 	"regexp"
+	"strings"
+	"path/filepath"
+	"io/ioutil"
 )
 
 const (
 	DEFAULT_PATH string = "~/.daylog"
-	CONFIG_USAGE = "Usage: daylog [global options] config {help | key | key=value}"
+	SETTING_USAGE = "Usage: daylog [global options] set {help | key | key=value}"
+	CONFIG_FILE = "config"
+	SETTING_FILE = "settings"
 )
 
 var verboseLevel int
@@ -19,6 +24,7 @@ var ok bool
 
 var configuration map[string]string
 var keyvaluePattern *regexp.Regexp = nil
+var commentPattern *regexp.Regexp = nil
 
 func usage() {
 	fmt.Println("Usage: daylog [global options] command [arguments]")
@@ -47,9 +53,29 @@ func parseKeyValue(s string) (key,value string) {
 	return
 }
 
-func config() {
+func parseComment(s string) (ret string) {
+	if commentPattern == nil {
+		pattern,err := regexp.Compile("\\s*([^#]*)\\s*(#(.*))?")
+		if err != nil {
+			fmt.Println("Error in parsing key=value regular expression: ",err.Error())
+			os.Exit(-1)
+		}
+		commentPattern = pattern
+	}
+	if !commentPattern.MatchString(s) {
+		return ""
+	}
+	groups := commentPattern.FindStringSubmatch(s)
+	if len(groups) != 4 {
+		return ""
+	}
+	ret = strings.TrimSpace(groups[1])
+	return
+}
+
+func set() {
 	if flag.NArg() != 2 || flag.Arg(1) == "help" {
-		fmt.Println(CONFIG_USAGE)
+		fmt.Println(SETTING_USAGE)
 		os.Exit(0)
 	}
 	configArg := flag.Arg(1)
@@ -68,18 +94,60 @@ func config() {
 	}
 }
 
-func set() {
-}
-
 func start() {
 }
 
 func readConfig() {
 	configuration = make(map[string]string)
-	configuration["key"] = "value"
+	configPath := filepath.Join(path,CONFIG_FILE)
+	configFile,err := ioutil.ReadFile(configPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Println(err.Error())
+			os.Exit(-1)
+		}
+		return
+	}
+	splitter,_ := regexp.Compile("\\n+")
+	configs := splitter.Split(string(configFile),-1)
+	for i,c := range(configs) {
+		line := parseComment(c)
+		if line == "" {
+			continue
+		}
+		key,value := parseKeyValue(line)
+		if key == "" {
+			fmt.Println("Invalid configuration in config: ",i+1)
+			os.Exit(-1)
+		}
+		configuration[key] = value
+	}
 }
 
 func readSetting() {
+	settingPath := filepath.Join(path,SETTING_FILE)
+	settingFile,err := ioutil.ReadFile(settingPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Println(err.Error())
+			os.Exit(-1)
+		}
+		return
+	}
+	splitter,_ := regexp.Compile("\\n+")
+	settings := splitter.Split(string(settingFile),-1)
+	for i,c := range(settings) {
+		line := parseComment(c)
+		if line == "" {
+			continue
+		}
+		key,value := parseKeyValue(line)
+		if key == "" {
+			fmt.Println("Invalid configuration in config: ",i+1)
+			os.Exit(-1)
+		}
+		configuration[key] = value
+	}
 }
 
 func setPath() {
@@ -115,15 +183,18 @@ func main() {
 	readConfig()
 	readSetting()
 
+	if flag.NArg() < 1 {
+		usage()
+	}
 	command := flag.Arg(0)
 
 	if command == "help" {
 		usage()
-	} else if command == "config" {
-		config()
 	} else if command == "set" {
 		set()
 	} else if command == "start" {
 		start()
+	} else {
+		usage()
 	}
 }
