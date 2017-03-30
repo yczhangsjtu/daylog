@@ -36,9 +36,28 @@ func GetFullTime(s string) (string,bool) {
 	return "",false
 }
 
+func GetDayString(s string) (string,bool) {
+	t,err := time.Parse(FORMAT,s)
+	if err == nil {
+		return t.Format(FORMAT_DAY),true
+	}
+	return "",false
+}
+
 func GetNowString() string {
 	now := time.Now()
 	return now.Format(FORMAT)
+}
+
+func GetTodayString() string {
+	now := time.Now()
+	return now.Format(FORMAT_DAY)
+}
+
+func GetYesterdayString() string {
+	now := time.Now()
+	now = now.AddDate(0,0,-1)
+	return now.Format(FORMAT_DAY)
 }
 
 func GetNow() *time.Time {
@@ -258,6 +277,17 @@ func (group *ScheduleGroup) AddString(s string) (err error) {
 	}
 	group.Add(item)
 	return
+}
+
+func (group *ScheduleGroup) Get(index int) (*ScheduleItem,error) {
+	if index < 0 || index >= group.Size() {
+		return nil,errors.New("Index out of group size!")
+	}
+	return group.items[index],nil
+}
+
+func (group *ScheduleGroup) GetLast() (*ScheduleItem,error) {
+	return group.Get(group.Size()-1)
 }
 
 func (group *ScheduleGroup) Size() int {

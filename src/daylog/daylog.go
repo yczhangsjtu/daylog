@@ -253,12 +253,11 @@ func start() {
 		startString := strings.Trim(string(startFile),"\n")
 		item,err := schedule.ScheduleItemFromString(startString)
 		if err == nil {
-			c := "n"
 			fmt.Printf("Task already started: %s\n",item.ContentString())
 			fmt.Printf("At Time: %s\n",item.StartString())
 			fmt.Printf("Want to override it? (y/N)")
 			stdin := bufio.NewReader(os.Stdin)
-			c,_ = stdin.ReadString('\n')
+			c,_ := stdin.ReadString('\n')
 			if c == "" || (c[0] != 'y' && c[0] != 'Y') {
 				return
 			}
@@ -307,13 +306,12 @@ func finish() {
 			fmt.Printf("Start file corrupted: %s\n",startPath)
 			os.Exit(-1)
 		}
-		c := "n"
 		fmt.Printf("Going to finish task: %s\n",item.ContentString())
 		fmt.Printf("Started at time: %s\n",item.StartString())
 		fmt.Printf("Proceed? (Y/n)")
 		stdin := bufio.NewReader(os.Stdin)
-		c,_ = stdin.ReadString('\n')
-		if c[0] == 'n' || c[0] == 'N' {
+		c,_ := stdin.ReadString('\n')
+		if c != "" && (c[0] == 'n' || c[0] == 'N') {
 			return
 		}
 		var ok bool
@@ -351,8 +349,82 @@ func finish() {
 }
 
 func prolongFinish(newtime string) {
-	fmt.Printf("Cannot prolong finish time!\n")
-	os.Exit(-1)
+	day := ""
+	if newtime == "" {
+		today := schedule.GetTodayString()
+		yesterday := schedule.GetYesterdayString()
+		schedulePath := filepath.Join(path,today)
+		scheduleGroup,err := schedule.ScheduleGroupFromFile(schedulePath)
+		if err != nil || scheduleGroup.Empty() {
+			if err != nil && !os.IsNotExist(err) {
+				fmt.Println(err.Error())
+				os.Exit(-1)
+			}
+			schedulePath := filepath.Join(path,yesterday)
+			scheduleGroup,err = schedule.ScheduleGroupFromFile(schedulePath)
+			if err != nil || scheduleGroup.Empty() {
+				if err != nil {
+					if !os.IsNotExist(err) {
+						fmt.Println(err.Error())
+						os.Exit(-1)
+					} else {
+						fmt.Println("Cannot prolong task started too long ago!\n")
+						os.Exit(-1)
+					}
+				}
+				fmt.Println("Cannot prolong task started too long ago!\n")
+				os.Exit(-1)
+			}
+			day = yesterday
+		} else {
+			day = today
+		}
+	} else {
+		newday,ok := schedule.GetDayString(newtime)
+		if !ok {
+			fmt.Printf("Invalid finish time %s\n",newtime)
+			os.Exit(-1)
+		}
+		day = newday
+	}
+	schedulePath := filepath.Join(path,day)
+	scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
+	if err != nil {
+		fmt.Printf("Error reading schedule file: %s: %s\n",schedulePath,err.Error())
+		os.Exit(-1)
+	}
+	if scheduleGroup.Empty() {
+		fmt.Printf("Empty schedule file: %s\n",schedulePath)
+		os.Exit(-1)
+	}
+	item,_ := scheduleGroup.GetLast()
+	fmt.Printf("No started schedule! Have to prolong the last item.\n")
+	fmt.Printf("Last: %s\n",item.ContentString())
+	fmt.Printf("Started at: %s\n",item.StartString())
+	fmt.Printf("Finished at: %s\n",item.FinishString())
+	fmt.Printf("Proceed to prolong? (Y/n)")
+	stdin := bufio.NewReader(os.Stdin)
+	c,_ := stdin.ReadString('\n')
+	if c != "" && (c[0] == 'n' || c[0] == 'N') {
+		return
+	}
+	var ok bool
+	if newtime == "" {
+		ok = item.SetFinish(schedule.GetNow())
+	} else {
+		ok = item.SetFinishString(newtime)
+	}
+	if !ok {
+		fmt.Printf("Failed to set finish string!\n")
+	}
+	scheduleGroup.RemoveLast()
+	scheduleGroup.Add(item)
+	err = ioutil.WriteFile(schedulePath,[]byte(scheduleGroup.StringOfDay(day)),0644)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(-1)
+	}
+	fmt.Printf("Update finish time to: %s\n",item.FinishString())
 }
 
 func readConfig() {
