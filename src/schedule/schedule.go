@@ -11,6 +11,10 @@ import (
 const FORMAT string = "2006.01.02/15:04"
 var itemPattern *regexp.Regexp
 
+/****************
+ * ScheduleItem *
+ ****************/
+
 type ScheduleItem struct {
 	start *time.Time
 	finish *time.Time
@@ -125,4 +129,84 @@ func (item *ScheduleItem) FinishString() string {
 
 func (item *ScheduleItem) ContentString() string {
 	return item.content
+}
+
+/*****************
+ * ScheduleGroup *
+ *****************/
+
+type ScheduleGroup struct {
+	items []*ScheduleItem
+}
+
+func NewScheduleGroup() (*ScheduleGroup) {
+	scheduleGroup := ScheduleGroup{[]*ScheduleItem{}}
+	return &scheduleGroup
+}
+
+func (group *ScheduleGroup) Add(item *ScheduleItem) {
+	group.items = append(group.items,item)
+}
+
+func (group *ScheduleGroup) AddString(s string) (err error) {
+	item,err := ScheduleItemFromString(s)
+	if err != nil {
+		return
+	}
+	group.Add(item)
+	return
+}
+
+func (group *ScheduleGroup) Size() int {
+	return len(group.items)
+}
+
+func (group *ScheduleGroup) Empty() bool {
+	return len(group.items) == 0
+}
+
+func (group *ScheduleGroup) RemoveLast() bool {
+	if group.Empty() {
+		return false
+	}
+	group.items = group.items[:group.Size()-1]
+	return true
+}
+
+func (group *ScheduleGroup) RemoveFirst() bool {
+	if group.Empty() {
+		return false
+	}
+	group.items = group.items[1:]
+	return true
+}
+
+func (group *ScheduleGroup) RemoveIndex(index int) bool {
+	if index == 0 {
+		return group.RemoveFirst()
+	}
+	if index == group.Size()-1 {
+		return group.RemoveLast()
+	}
+	if group.Empty() || index >= group.Size() {
+		return false
+	}
+	left := group.items[:index]
+	right := group.items[index+1:]
+	group.items = append(left,right...)
+	return true
+}
+
+func (group *ScheduleGroup) Print() {
+	for i,item := range(group.items) {
+		fmt.Printf("%3d: %s\n",i+1,item.String())
+	}
+}
+
+func (group *ScheduleGroup) String() (s string) {
+	s = ""
+	for i,item := range(group.items) {
+		s += fmt.Sprintf("%3d: %s\n",i+1,item.String())
+	}
+	return
 }
