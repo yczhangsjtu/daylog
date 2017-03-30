@@ -24,7 +24,36 @@ var ok bool
 
 var configuration map[string]string
 var keyvaluePattern *regexp.Regexp = nil
+var specialPattern *regexp.Regexp = nil
 var commentPattern *regexp.Regexp = nil
+var labelPattern *regexp.Regexp = nil
+
+type SettingGroup struct {
+	name string
+	label string
+	color string
+	pattern string
+}
+
+var settingGroups map[string]*SettingGroup
+
+func NewSettingGroup(name string) (g *SettingGroup) {
+	g = &SettingGroup{name,name,"",""}
+	return
+}
+
+func (g *SettingGroup) set(key,value string) bool {
+	if key == "color" {
+		g.color = value
+	} else if key == "pattern" {
+		g.pattern = value
+	} else if key == "label" {
+		g.label = value
+	} else {
+		return false
+	}
+	return true
+}
 
 func usage() {
 	fmt.Println("Usage: daylog [global options] command [arguments]")
@@ -34,7 +63,7 @@ func usage() {
 
 func parseKeyValue(s string) (key,value string) {
 	if keyvaluePattern == nil {
-		pattern,err := regexp.Compile("(\\w+)(=(\\w+))?")
+		pattern,err := regexp.Compile("^(\\w+)(=(\\w+))?$")
 		if err != nil {
 			fmt.Println("Error in parsing key=value regular expression: ",err.Error())
 			os.Exit(-1)
@@ -53,11 +82,52 @@ func parseKeyValue(s string) (key,value string) {
 	return
 }
 
+func parseSpecialKeyValue(s string) (key,value string) {
+	if specialPattern == nil {
+		pattern,err := regexp.Compile("^(\\w+)(=([ -~]+))?$")
+		if err != nil {
+			fmt.Println("Error in parsing special key=value regular expression: ",err.Error())
+			os.Exit(-1)
+		}
+		specialPattern = pattern
+	}
+	if !specialPattern.MatchString(s) {
+		return "",""
+	}
+	pair := specialPattern.FindStringSubmatch(s)
+	if len(pair) != 4 {
+		return "",""
+	}
+	key = pair[1]
+	value = pair[3]
+	return
+}
+
+func parseGroupLabel(s string) (label string) {
+	if labelPattern == nil {
+		pattern,err := regexp.Compile("^\\[(\\w+)\\]$")
+		if err != nil {
+			fmt.Println("Error in parsing special label regular expression: ",err.Error())
+			os.Exit(-1)
+		}
+		labelPattern = pattern
+	}
+	if !labelPattern.MatchString(s) {
+		return ""
+	}
+	groups := labelPattern.FindStringSubmatch(s)
+	if len(groups) != 2 {
+		return ""
+	}
+	label = groups[1]
+	return
+}
+
 func parseComment(s string) (ret string) {
 	if commentPattern == nil {
-		pattern,err := regexp.Compile("\\s*([^#]*)\\s*(#(.*))?")
+		pattern,err := regexp.Compile("^\\s*([^#]*)\\s*(#(.*))?$")
 		if err != nil {
-			fmt.Println("Error in parsing key=value regular expression: ",err.Error())
+			fmt.Println("Error in parsing comment regular expression: ",err.Error())
 			os.Exit(-1)
 		}
 		commentPattern = pattern
@@ -79,7 +149,7 @@ func set() {
 		os.Exit(0)
 	}
 	configArg := flag.Arg(1)
-	key,value := parseKeyValue(configArg)
+	key,value := parseSpecialKeyValue(configArg)
 	if key == "" {
 		fmt.Println("Invalid key/value pair!")
 		os.Exit(-1)
@@ -117,7 +187,7 @@ func readConfig() {
 		}
 		key,value := parseKeyValue(line)
 		if key == "" {
-			fmt.Println("Invalid configuration in config: ",i+1)
+			fmt.Printf("Invalid configuration in %s: %d\n",CONFIG_FILE,i+1)
 			os.Exit(-1)
 		}
 		configuration[key] = value
@@ -136,17 +206,33 @@ func readSetting() {
 	}
 	splitter,_ := regexp.Compile("\\n+")
 	settings := splitter.Split(string(settingFile),-1)
+	currentGroup := "global"
+	settingGroups = make(map[string]*SettingGroup)
+	settingGroups[currentGroup] = NewSettingGroup(currentGroup)
 	for i,c := range(settings) {
 		line := parseComment(c)
 		if line == "" {
 			continue
 		}
-		key,value := parseKeyValue(line)
-		if key == "" {
-			fmt.Println("Invalid configuration in config: ",i+1)
-			os.Exit(-1)
+		key,value := parseSpecialKeyValue(line)
+		if key != "" {
+			if verboseLevel > 1 {
+				fmt.Printf("%s[%s] = [%s]\n",currentGroup,key,value)
+			}
+			settingGroups[currentGroup].set(key,value)
+			continue
 		}
-		configuration[key] = value
+		label := parseGroupLabel(line)
+		if label != "" {
+			currentGroup = label
+			_,ok = settingGroups[label]
+			if !ok {
+				settingGroups[label] = NewSettingGroup(label)
+			}
+			continue
+		}
+		fmt.Printf("Invalid setting in %s: %d\n",SETTING_FILE,i+1)
+		os.Exit(-1)
 	}
 }
 
