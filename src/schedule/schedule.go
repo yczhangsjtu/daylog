@@ -9,7 +9,29 @@ import (
 )
 
 const FORMAT string = "2006.01.02/15:04"
+const FORMAT_CLOCK string = "15:04"
+const FORMAT_DAY_CLOCK string = "01.02/15:04"
 var itemPattern *regexp.Regexp
+
+func GetFullTime(s string) (string,bool) {
+	t,err := time.Parse(FORMAT,s)
+	if err == nil {
+		return t.Format(FORMAT),true
+	}
+	t,err = time.Parse(FORMAT_CLOCK,s)
+	if err == nil {
+		now := time.Now()
+		t = time.Date(now.Year(),now.Month(),now.Day(),t.Hour(),t.Minute(),0,0,time.UTC)
+		return t.Format(FORMAT),true
+	}
+	t,err = time.Parse(FORMAT_DAY_CLOCK,s)
+	if err == nil {
+		now := time.Now()
+		t = time.Date(now.Year(),t.Month(),t.Day(),t.Hour(),t.Minute(),0,0,time.UTC)
+		return t.Format(FORMAT),true
+	}
+	return "",false
+}
 
 /****************
  * ScheduleItem *
@@ -27,9 +49,17 @@ func NewScheduleItem() (item *ScheduleItem) {
 	return item
 }
 
+func ScheduleItemNow(content string) (item *ScheduleItem) {
+	item = NewScheduleItem()
+	now := time.Now()
+	item.start = &now
+	item.content = content
+	return item
+}
+
 func ScheduleItemFromString(s string) (item *ScheduleItem,err error) {
 	if itemPattern == nil {
-		pattern,e := regexp.Compile("^(\\d\\d\\d\\d\\.\\d\\d\\.\\d\\d/\\d\\d:\\d\\d) (\\d\\d\\d\\d\\.\\d\\d\\.\\d\\d/\\d\\d:\\d\\d)( [ -~]*)?$")
+		pattern,e := regexp.Compile("^(\\d\\d\\d\\d\\.\\d\\d\\.\\d\\d/\\d\\d:\\d\\d) (\\d\\d\\d\\d\\.\\d\\d\\.\\d\\d/\\d\\d:\\d\\d)?( [ -~]*)?$")
 		if e != nil {
 			return nil,e
 		}
@@ -44,18 +74,23 @@ func ScheduleItemFromString(s string) (item *ScheduleItem,err error) {
 	}
 	startPattern := groups[1]
 	finishPattern := groups[2]
+	item = NewScheduleItem()
 	content := strings.TrimSpace(groups[3])
 	startTime,e := time.Parse(FORMAT,startPattern)
 	if e != nil {
 		return nil,e
 	}
-	finishTime,e := time.Parse(FORMAT,finishPattern)
-	if e != nil {
-		return nil,e
+	if !item.SetStart(&startTime) {
+		return nil,errors.New("Invalid start time")
 	}
-	item = NewScheduleItem()
-	if !item.SetStartFinish(&startTime,&finishTime) {
-		return nil,errors.New("Invalid start time and finish time")
+	if finishPattern != "" {
+		finishTime,e := time.Parse(FORMAT,finishPattern)
+		if e != nil {
+			return nil,e
+		}
+		if !item.SetFinish(&finishTime) {
+			return nil,errors.New("Invalid finish time")
+		}
 	}
 	item.SetContent(content)
 	return item,nil
@@ -120,11 +155,17 @@ func (item *ScheduleItem) String() string {
 }
 
 func (item *ScheduleItem) StartString() string {
-	return item.start.Format(FORMAT)
+	if item.start != nil {
+		return item.start.Format(FORMAT)
+	}
+	return ""
 }
 
 func (item *ScheduleItem) FinishString() string {
-	return item.finish.Format(FORMAT)
+	if item.finish != nil {
+		return item.finish.Format(FORMAT)
+	}
+	return ""
 }
 
 func (item *ScheduleItem) ContentString() string {

@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"schedule"
+	"bufio"
 	"path/filepath"
 	"io/ioutil"
+	"os/user"
 )
 
 const (
@@ -15,6 +18,7 @@ const (
 	SETTING_USAGE = "Usage: daylog [global options] set {help | key | key=value}"
 	CONFIG_FILE = "config"
 	SETTING_FILE = "settings"
+	START_FILE = "start"
 )
 
 var verboseLevel int
@@ -27,6 +31,7 @@ var keyvaluePattern *regexp.Regexp = nil
 var specialPattern *regexp.Regexp = nil
 var commentPattern *regexp.Regexp = nil
 var labelPattern *regexp.Regexp = nil
+var groupPattern *regexp.Regexp = nil
 
 type SettingGroup struct {
 	name string
@@ -49,10 +54,32 @@ func (g *SettingGroup) set(key,value string) bool {
 		g.pattern = value
 	} else if key == "label" {
 		g.label = value
-	} else {
-		return false
 	}
-	return true
+	return false
+}
+
+func (g *SettingGroup) get(key string) (v string,ok bool) {
+	if key == "color" {
+		return g.color,true
+	} else if key == "pattern" {
+		return g.pattern,true
+	} else if key == "label" {
+		return g.label,true
+	}
+	return "",false
+}
+
+func (g *SettingGroup) String() string {
+	return fmt.Sprintf("[%s]\nlabel=%s\ncolor=%s\npattern=%s\n",g.name,g.label,g.color,g.pattern)
+}
+
+func EvalPath(p string) string {
+	if p[:2] == "~/" {
+		usr,_ := user.Current()
+		dir := usr.HomeDir
+		return filepath.Join(dir,p[2:])
+	}
+	return p
 }
 
 func usage() {
@@ -82,9 +109,31 @@ func parseKeyValue(s string) (key,value string) {
 	return
 }
 
+func parseGroupKeyValue(s string) (group,key,value string) {
+	if groupPattern == nil {
+		pattern,err := regexp.Compile("^(\\w+)\\.(\\w+)(=([ -~]+))?$")
+		if err != nil {
+			fmt.Println("Error in parsing special key=value regular expression: ",err.Error())
+			os.Exit(-1)
+		}
+		groupPattern = pattern
+	}
+	if !groupPattern.MatchString(s) {
+		return "","",""
+	}
+	pair := groupPattern.FindStringSubmatch(s)
+	if len(pair) != 5 {
+		return "","",""
+	}
+	group = pair[1]
+	key = pair[2]
+	value = pair[4]
+	return
+}
+
 func parseSpecialKeyValue(s string) (key,value string) {
 	if specialPattern == nil {
-		pattern,err := regexp.Compile("^(\\w+)(=([ -~]+))?$")
+		pattern,err := regexp.Compile("^(\\w+)(=([ -~]*))?$")
 		if err != nil {
 			fmt.Println("Error in parsing special key=value regular expression: ",err.Error())
 			os.Exit(-1)
@@ -149,32 +198,105 @@ func set() {
 		os.Exit(0)
 	}
 	configArg := flag.Arg(1)
-	key,value := parseSpecialKeyValue(configArg)
-	if key == "" {
-		fmt.Println("Invalid key/value pair!")
+	name,key,value := parseGroupKeyValue(configArg)
+	if name == "" || key == "" {
+		fmt.Println("Invalid group.key/value pair!")
 		os.Exit(-1)
 	}
 	if value == "" {
-		fmt.Println(key,":",configuration[key])
-	} else {
-		configuration[key] = value
-		if verboseLevel > 0 {
-			fmt.Println(key,"is set to",value)
+		settingGroup,ok := settingGroups[name]
+		if !ok {
+			fmt.Printf("Group not exist: %s\n",name)
+			os.Exit(-1)
 		}
+		value,ok = settingGroup.get(key)
+		if ok {
+			fmt.Printf("%s.%s: %s\n",name,key,value)
+		} else {
+			fmt.Printf("Invalid key: %s\n",key)
+		}
+	} else {
+		settingGroup,ok := settingGroups[name]
+		if !ok {
+			settingGroups[name] = NewSettingGroup(name)
+			settingGroup,_ = settingGroups[name]
+			if verboseLevel > 0 {
+				fmt.Printf("Group %s not existed, created now\n",name)
+			}
+		}
+		settingGroup.set(key,value)
+		if verboseLevel > 0 {
+			fmt.Printf("%s.%s is set to %s\n",name,key,value)
+		}
+		saveSetting()
 	}
 }
 
 func start() {
+	startPath := filepath.Join(path,START_FILE)
+	startFile,err := ioutil.ReadFile(startPath)
+	content := ""
+	startTime := ""
+	if flag.NArg() > 1 {
+		content = flag.Arg(1)
+	}
+	if flag.NArg() > 2 {
+		startTime = flag.Arg(2)
+		tmp,ok := schedule.GetFullTime(startTime)
+		if !ok {
+			fmt.Printf("Invalid time: %s\n",flag.Arg(2))
+			os.Exit(-1)
+		}
+		startTime = tmp
+	}
+	if err == nil {
+		startString := strings.Trim(string(startFile),"\n")
+		item,err := schedule.ScheduleItemFromString(startString)
+		if err == nil {
+			c := "n"
+			fmt.Printf("Task already started: %s\n",item.ContentString())
+			fmt.Printf("At Time: %s\n",item.StartString())
+			fmt.Printf("Want to override it? (y/N)")
+			stdin := bufio.NewReader(os.Stdin)
+			c,_ = stdin.ReadString('\n')
+			if c == "" || (c[0] != 'y' && c[0] != 'Y') {
+				return
+			}
+		}
+	} else if !os.IsNotExist(err) {
+		fmt.Printf("Error in reading start file: %s\n",err.Error())
+		os.Exit(-1)
+	}
+	item := schedule.ScheduleItemNow(content)
+	if startTime != "" {
+		item.SetStartString(startTime)
+	}
+	fmt.Printf("Started: %s\n",item.ContentString())
+	fmt.Printf("Time: %s\n",item.StartString())
+	err = ioutil.WriteFile(startPath,[]byte(item.String()),0644)
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(-1)
+	}
+}
+
+func finish() {
 }
 
 func readConfig() {
 	configuration = make(map[string]string)
 	configPath := filepath.Join(path,CONFIG_FILE)
+	if verboseLevel > 0 {
+		fmt.Printf("Reading configuration file: %s\n",configPath)
+	}
 	configFile,err := ioutil.ReadFile(configPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			fmt.Println(err.Error())
 			os.Exit(-1)
+		}
+		if verboseLevel > 0 {
+			fmt.Printf("Config file %s not exist, use default configuration\n",configPath)
 		}
 		return
 	}
@@ -195,19 +317,25 @@ func readConfig() {
 }
 
 func readSetting() {
+	settingGroups = make(map[string]*SettingGroup)
 	settingPath := filepath.Join(path,SETTING_FILE)
+	if verboseLevel > 0 {
+		fmt.Printf("Reading setting file: %s\n",settingPath)
+	}
 	settingFile,err := ioutil.ReadFile(settingPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			fmt.Println(err.Error())
 			os.Exit(-1)
 		}
+		if verboseLevel > 0 {
+			fmt.Printf("Setting file %s not exist, use default setting \n",settingPath)
+		}
 		return
 	}
 	splitter,_ := regexp.Compile("\\n+")
 	settings := splitter.Split(string(settingFile),-1)
 	currentGroup := "global"
-	settingGroups = make(map[string]*SettingGroup)
 	settingGroups[currentGroup] = NewSettingGroup(currentGroup)
 	for i,c := range(settings) {
 		line := parseComment(c)
@@ -231,7 +359,20 @@ func readSetting() {
 			}
 			continue
 		}
-		fmt.Printf("Invalid setting in %s: %d\n",SETTING_FILE,i+1)
+		fmt.Printf("Invalid setting in '%s:%d'\n",SETTING_FILE,i+1)
+		os.Exit(-1)
+	}
+}
+
+func saveSetting() {
+	settingPath := filepath.Join(path,SETTING_FILE)
+	settings := ""
+	for _,group := range settingGroups {
+		settings += group.String()
+	}
+	err := ioutil.WriteFile(settingPath,[]byte(settings),0644)
+	if err != nil {
+		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
 }
@@ -239,7 +380,7 @@ func readSetting() {
 func setPath() {
 	path,ok = os.LookupEnv("DAYLOG_PATH")
 	if !ok {
-		path = DEFAULT_PATH
+		path = EvalPath(DEFAULT_PATH)
 	}
 	if verboseLevel > 0 {
 		fmt.Println("Base path set to: ",path)
@@ -280,6 +421,8 @@ func main() {
 		set()
 	} else if command == "start" {
 		start()
+	} else if command == "finish" {
+		finish()
 	} else {
 		usage()
 	}
