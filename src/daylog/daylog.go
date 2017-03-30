@@ -234,7 +234,6 @@ func set() {
 
 func start() {
 	startPath := filepath.Join(path,START_FILE)
-	startFile,err := ioutil.ReadFile(startPath)
 	content := ""
 	startTime := ""
 	if flag.NArg() > 1 {
@@ -249,6 +248,7 @@ func start() {
 		}
 		startTime = tmp
 	}
+	startFile,err := ioutil.ReadFile(startPath)
 	if err == nil {
 		startString := strings.Trim(string(startFile),"\n")
 		item,err := schedule.ScheduleItemFromString(startString)
@@ -281,6 +281,78 @@ func start() {
 }
 
 func finish() {
+	startPath := filepath.Join(path,START_FILE)
+	finishTime := ""
+	if flag.NArg() > 1 {
+		finishTime = flag.Arg(1)
+		tmp,ok := schedule.GetFullTime(finishTime)
+		if !ok {
+			fmt.Printf("Invalid time: %s\n",flag.Arg(1))
+			os.Exit(-1)
+		}
+		finishTime = tmp
+	}
+	startFile,err := ioutil.ReadFile(startPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Printf("Error in reading start file: %s\n",err.Error())
+			os.Exit(-1)
+		} else {
+			prolongFinish(finishTime)
+		}
+	} else {
+		startString := strings.Trim(string(startFile),"\n")
+		item,err := schedule.ScheduleItemFromString(startString)
+		if err != nil {
+			fmt.Printf("Start file corrupted: %s\n",startPath)
+			os.Exit(-1)
+		}
+		c := "n"
+		fmt.Printf("Going to finish task: %s\n",item.ContentString())
+		fmt.Printf("Started at time: %s\n",item.StartString())
+		fmt.Printf("Proceed? (Y/n)")
+		stdin := bufio.NewReader(os.Stdin)
+		c,_ = stdin.ReadString('\n')
+		if c[0] == 'n' || c[0] == 'N' {
+			return
+		}
+		var ok bool
+		if finishTime != "" {
+			fmt.Printf("Going to finish at %s\n",finishTime)
+			ok = item.SetFinishString(finishTime)
+		} else {
+			ok = item.SetFinish(schedule.GetNow())
+			fmt.Printf("Going to finish at %s\n",schedule.GetNowString())
+		}
+		if !ok {
+			fmt.Printf("Failed to set finish time!\n")
+			os.Exit(-1)
+		}
+		day := item.StartDayString()
+		schedulePath := filepath.Join(path,day)
+		scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
+		if err != nil {
+			fmt.Printf("Error reading schedule file: %s: %s",schedulePath,err.Error())
+			os.Exit(-1)
+		}
+		scheduleGroup.Add(item)
+		err = ioutil.WriteFile(schedulePath,[]byte(scheduleGroup.StringOfDay(day)),0644)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(-1)
+		}
+		fmt.Printf("Finished at time: %s\n",item.FinishString())
+		err = os.Remove(startPath)
+		if err != nil {
+			fmt.Println(err.Error())
+			os.Exit(-1)
+		}
+	}
+}
+
+func prolongFinish(newtime string) {
+	fmt.Printf("Cannot prolong finish time!\n")
+	os.Exit(-1)
 }
 
 func readConfig() {

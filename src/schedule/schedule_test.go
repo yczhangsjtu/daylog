@@ -70,9 +70,9 @@ func TestScheduleGroupString(t *testing.T) {
 	group.AddString("2017.03.29/17:43 2017.03.29/18:12 Read Paper")
 	group.AddString("2017.03.29/18:42 2017.03.29/19:12 Java")
 	expect := fmt.Sprintf("%s\n%s\n%s\n",
-		"  1: 2017.03.29/17:32 2017.03.29/17:42 Java",
-		"  2: 2017.03.29/17:43 2017.03.29/18:12 Read Paper",
-		"  3: 2017.03.29/18:42 2017.03.29/19:12 Java")
+		"2017.03.29/17:32 2017.03.29/17:42 Java",
+		"2017.03.29/17:43 2017.03.29/18:12 Read Paper",
+		"2017.03.29/18:42 2017.03.29/19:12 Java")
 	result := group.String()
 	if result != expect {
 		t.Errorf("group.String() failed! Expect %s, got %s\n",expect,result)

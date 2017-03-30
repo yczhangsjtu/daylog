@@ -1,16 +1,19 @@
 package schedule
 
 import (
+	"os"
 	"fmt"
 	"time"
 	"regexp"
 	"errors"
 	"strings"
+	"io/ioutil"
 )
 
 const FORMAT string = "2006.01.02/15:04"
 const FORMAT_CLOCK string = "15:04"
 const FORMAT_DAY_CLOCK string = "01.02/15:04"
+const FORMAT_DAY string = "2006.01.02"
 var itemPattern *regexp.Regexp
 
 func GetFullTime(s string) (string,bool) {
@@ -31,6 +34,16 @@ func GetFullTime(s string) (string,bool) {
 		return t.Format(FORMAT),true
 	}
 	return "",false
+}
+
+func GetNowString() string {
+	now := time.Now()
+	return now.Format(FORMAT)
+}
+
+func GetNow() *time.Time {
+	now,_ := time.Parse(FORMAT,GetNowString())
+	return &now
 }
 
 /****************
@@ -139,6 +152,7 @@ func (item *ScheduleItem) SetFinish(finish *time.Time) bool {
 		item.finish = finish
 		return true
 	}
+	fmt.Printf("item.start = %s, item.finish = %s\n",item.start.String(),finish.String())
 	return false
 }
 
@@ -161,9 +175,23 @@ func (item *ScheduleItem) StartString() string {
 	return ""
 }
 
+func (item *ScheduleItem) StartDayString() string {
+	if item.start != nil {
+		return item.start.Format(FORMAT_DAY)
+	}
+	return ""
+}
+
 func (item *ScheduleItem) FinishString() string {
 	if item.finish != nil {
 		return item.finish.Format(FORMAT)
+	}
+	return ""
+}
+
+func (item *ScheduleItem) FinishDayString() string {
+	if item.finish != nil {
+		return item.finish.Format(FORMAT_DAY)
 	}
 	return ""
 }
@@ -183,6 +211,40 @@ type ScheduleGroup struct {
 func NewScheduleGroup() (*ScheduleGroup) {
 	scheduleGroup := ScheduleGroup{[]*ScheduleItem{}}
 	return &scheduleGroup
+}
+
+func ScheduleGroupFromFile(filename string) (*ScheduleGroup,error) {
+	scheduleFile,err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil,err
+	}
+	splitter,err := regexp.Compile("\\n+")
+	if err != nil {
+		return nil,err
+	}
+	schedules := splitter.Split(string(scheduleFile),-1)
+	scheduleGroup := NewScheduleGroup()
+	for _,schedule := range schedules {
+		if schedule == "" {
+			continue
+		}
+		err := scheduleGroup.AddString(schedule)
+		if err != nil {
+			return nil,err
+		}
+	}
+	return scheduleGroup,nil
+}
+
+func ScheduleGroupFromPossibleFile(filename string) (*ScheduleGroup,error) {
+	scheduleGroup,err := ScheduleGroupFromFile(filename)
+	if err == nil {
+		return scheduleGroup,err
+	}
+	if os.IsNotExist(err) {
+		return NewScheduleGroup(),nil
+	}
+	return nil,err
 }
 
 func (group *ScheduleGroup) Add(item *ScheduleItem) {
@@ -246,8 +308,22 @@ func (group *ScheduleGroup) Print() {
 
 func (group *ScheduleGroup) String() (s string) {
 	s = ""
-	for i,item := range(group.items) {
-		s += fmt.Sprintf("%3d: %s\n",i+1,item.String())
+	for _,item := range(group.items) {
+		s += fmt.Sprintf("%s\n",item.String())
+	}
+	return
+}
+
+func (group *ScheduleGroup) StringOfDay(day string) (s string) {
+	_,err := time.Parse(FORMAT_DAY,day)
+	if err != nil {
+		return ""
+	}
+	s = ""
+	for _,item := range group.items {
+		if item.StartDayString() == day {
+			s += fmt.Sprintf("%s\n",item.String())
+		}
 	}
 	return
 }
