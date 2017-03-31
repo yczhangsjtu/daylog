@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strings"
 	"schedule"
-	"bufio"
 	"path/filepath"
 	"io/ioutil"
 )
@@ -156,30 +155,7 @@ func finish() {
 func prolongFinish(newtime string) {
 	day := ""
 	if newtime == "" {
-		today := schedule.GetTodayString()
-		yesterday := schedule.GetYesterdayString()
-		schedulePath := filepath.Join(path,today)
-		scheduleGroup,err := schedule.ScheduleGroupFromFile(schedulePath)
-		if err != nil || scheduleGroup.Empty() {
-			if err != nil && !os.IsNotExist(err) {
-				log.Fatalf(err.Error())
-			}
-			schedulePath := filepath.Join(path,yesterday)
-			scheduleGroup,err = schedule.ScheduleGroupFromFile(schedulePath)
-			if err != nil || scheduleGroup.Empty() {
-				if err != nil {
-					if !os.IsNotExist(err) {
-						log.Fatalf(err.Error())
-					} else {
-						log.Fatal("Cannot prolong task started too long ago!\n")
-					}
-				}
-				log.Fatal("Cannot prolong task started too long ago!\n")
-			}
-			day = yesterday
-		} else {
-			day = today
-		}
+		day = schedule.GetTodayString()
 	} else {
 		newday,ok := schedule.GetDayString(newtime)
 		if !ok {
@@ -187,8 +163,33 @@ func prolongFinish(newtime string) {
 		}
 		day = newday
 	}
-	schedulePath := filepath.Join(path,day)
-	scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
+	today := day
+	yesterday,err := schedule.DayAddString(today,-1)
+	fatalError("Invalid day "+today,err)
+	schedulePath := filepath.Join(path,today)
+	scheduleGroup,err := schedule.ScheduleGroupFromFile(schedulePath)
+	if err != nil || scheduleGroup.Empty() {
+		if err != nil && !os.IsNotExist(err) {
+			log.Fatalf(err.Error())
+		}
+		schedulePath := filepath.Join(path,yesterday)
+		scheduleGroup,err = schedule.ScheduleGroupFromFile(schedulePath)
+		if err != nil || scheduleGroup.Empty() {
+			if err != nil {
+				if !os.IsNotExist(err) {
+					log.Fatalf(err.Error())
+				} else {
+					log.Fatal("Cannot prolong task started too long ago!\n")
+				}
+			}
+			log.Fatal("Cannot prolong task started too long ago!\n")
+		}
+		day = yesterday
+	} else {
+		day = today
+	}
+	schedulePath = filepath.Join(path,day)
+	scheduleGroup,err = schedule.ScheduleGroupFromPossibleFile(schedulePath)
 	fatalError("Error reading schedule file: "+schedulePath,err)
 	if scheduleGroup.Empty() {
 		log.Fatalf("Empty schedule file: %s\n",schedulePath)
@@ -199,9 +200,7 @@ func prolongFinish(newtime string) {
 	fmt.Printf("Started at: %s\n",item.StartString())
 	fmt.Printf("Finished at: %s\n",item.FinishString())
 	fmt.Printf("Proceed to prolong? (Y/n)")
-	stdin := bufio.NewReader(os.Stdin)
-	c,_ := stdin.ReadString('\n')
-	if c != "" && (c[0] == 'n' || c[0] == 'N') {
+	if !UserProceed(true) {
 		return
 	}
 	var ok bool

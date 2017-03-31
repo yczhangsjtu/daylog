@@ -76,7 +76,7 @@ func ExpandTime(s string) string {
 func UserProceed(deft bool) bool {
 	stdin := bufio.NewReader(os.Stdin)
 	c,_ := stdin.ReadString('\n')
-	if c == "" {
+	if c == "\n" {
 		return deft
 	}
 	if c[0] != 'y' && c[0] != 'Y' {
