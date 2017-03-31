@@ -339,7 +339,9 @@ func finish() {
 			fmt.Println(err.Error())
 			os.Exit(-1)
 		}
+		duration,_ := item.DurationString()
 		fmt.Printf("Finished at time: %s\n",item.FinishString())
+		fmt.Printf("Duration: %s\n",duration)
 		err = os.Remove(startPath)
 		if err != nil {
 			fmt.Println(err.Error())
@@ -424,7 +426,9 @@ func prolongFinish(newtime string) {
 		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
+	duration,_ := item.DurationString()
 	fmt.Printf("Update finish time to: %s\n",item.FinishString())
+	fmt.Printf("Duration: %s\n",duration)
 }
 
 func list() {
@@ -466,8 +470,10 @@ func list() {
 		fmt.Printf("Day %s\n",day)
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
-			fmt.Printf("  From %s to %s: %s\n",
-				item.StartString(),item.FinishString(),item.ContentString())
+			duration,_ := item.DurationString()
+			duration = fmt.Sprintf("(%s)",duration)
+			fmt.Printf("  From %s to %s %8s: %s\n",
+				item.StartString(),item.FinishString(),duration,item.ContentString())
 		}
 	}
 }

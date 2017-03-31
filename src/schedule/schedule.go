@@ -269,6 +269,28 @@ func (item *ScheduleItem) ContentString() string {
 	return item.content
 }
 
+func (item *ScheduleItem) Duration() (int,error) {
+	if item.start == nil {
+		return 0,errors.New("Empty start time")
+	}
+	if item.finish == nil {
+		return 0,errors.New("Empty finish time")
+	}
+	minute := int(item.finish.Sub(*item.start).Minutes())
+	return minute,nil
+}
+
+func (item *ScheduleItem) DurationString() (string,error) {
+	minute,err := item.Duration()
+	if err != nil {
+		return "",err
+	}
+	if minute >= 60 {
+		return fmt.Sprintf("%d:%02dm",minute/60,minute%60),nil
+	}
+	return fmt.Sprintf("%dm",minute),nil
+}
+
 /*****************
  * ScheduleGroup *
  *****************/
