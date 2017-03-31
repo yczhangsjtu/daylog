@@ -14,6 +14,7 @@ const FORMAT string = "2006.01.02/15:04"
 const FORMAT_CLOCK string = "15:04"
 const FORMAT_DAY_CLOCK string = "01.02/15:04"
 const FORMAT_DAY string = "2006.01.02"
+const FORMAT_ONLY_DAY string = "01.02"
 var itemPattern *regexp.Regexp
 
 func GetFullTime(s string) (string,bool) {
@@ -33,6 +34,10 @@ func GetFullTime(s string) (string,bool) {
 		t = time.Date(now.Year(),t.Month(),t.Day(),t.Hour(),t.Minute(),0,0,time.UTC)
 		return t.Format(FORMAT),true
 	}
+	t,err = time.Parse(FORMAT_DAY,s)
+	if err == nil {
+		return t.Format(FORMAT),true
+	}
 	return "",false
 }
 
@@ -42,6 +47,51 @@ func GetDayString(s string) (string,bool) {
 		return t.Format(FORMAT_DAY),true
 	}
 	return "",false
+}
+
+func IsDayString(s string) bool {
+	_,err := time.Parse(FORMAT_DAY,s)
+	return err == nil
+}
+
+func FullDayString(s string) (string,bool) {
+	full,ok := GetFullTime(s)
+	if !ok {
+		return "",false
+	}
+	return GetDayString(full)
+}
+
+func CompareDayString(start,to string) int {
+	startDay,err := time.Parse(FORMAT_DAY,start)
+	if err != nil {
+		return -2
+	}
+	toDay,err := time.Parse(FORMAT_DAY,to)
+	if err != nil {
+		return -2
+	}
+	if startDay.Before(toDay) {
+		return -1
+	} else if startDay.After(toDay) {
+		return 1
+	} else {
+		return 0
+	}
+}
+
+func DayNotAfterString(start,to string) bool {
+	cmp := CompareDayString(start,to)
+	return cmp == -1 || cmp == 0
+}
+
+func TomorrowString(s string) (string,error) {
+	day,err := time.Parse(FORMAT_DAY,s)
+	if err != nil {
+		return s,err
+	}
+	day = day.AddDate(0,0,1)
+	return day.Format(FORMAT_DAY),nil
 }
 
 func GetNowString() string {

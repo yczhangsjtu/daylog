@@ -427,6 +427,62 @@ func prolongFinish(newtime string) {
 	fmt.Printf("Update finish time to: %s\n",item.FinishString())
 }
 
+func list() {
+	startDay := "yesterday"
+	toDay := "today"
+	if flag.NArg() > 1 {
+		startDay = flag.Arg(1)
+		toDay = startDay
+	}
+	if flag.NArg() > 2 {
+		toDay = flag.Arg(2)
+	}
+	var ok1,ok2 bool
+	startDay,ok1 = evalDay(startDay)
+	toDay,ok2 = evalDay(toDay)
+	if !ok1 {
+		fmt.Printf("Invalid start day: %s\n",startDay)
+		os.Exit(-1)
+	}
+	if !ok2 {
+		fmt.Printf("Invalid end day: %s\n",toDay)
+		os.Exit(-1)
+	}
+	if !schedule.DayNotAfterString(startDay,toDay) {
+		fmt.Println("Start day is later than end day!")
+		os.Exit(-1)
+	}
+	for day,err := startDay,error(nil); schedule.DayNotAfterString(day,toDay);
+			day,err = schedule.TomorrowString(day) {
+		if err != nil {
+			fmt.Printf("Error processing day %s: %s\n",day,err.Error())
+		}
+		schedulePath := filepath.Join(path,day)
+		scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
+		if err != nil {
+			fmt.Printf("Error reading schedule of day %s: %s\n",day,err.Error())
+			os.Exit(-1)
+		}
+		fmt.Printf("Day %s\n",day)
+		for i := 0; i < scheduleGroup.Size(); i++ {
+			item,_ := scheduleGroup.Get(i)
+			fmt.Printf("  From %s to %s: %s\n",
+				item.StartString(),item.FinishString(),item.ContentString())
+		}
+	}
+}
+
+func evalDay(day string) (string,bool) {
+	if day == "today" {
+		return schedule.GetTodayString(),true
+	} else if day == "yesterday" {
+		return schedule.GetYesterdayString(),true
+	} else {
+		return schedule.FullDayString(day)
+	}
+	return day,false
+}
+
 func readConfig() {
 	configuration = make(map[string]string)
 	configPath := filepath.Join(path,CONFIG_FILE)
@@ -567,6 +623,8 @@ func main() {
 		start()
 	} else if command == "finish" {
 		finish()
+	} else if command == "list" {
+		list()
 	} else {
 		usage()
 	}
