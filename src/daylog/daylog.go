@@ -4,6 +4,7 @@ import (
 	"os"
 	"flag"
 	"fmt"
+	"log"
 	"sort"
 	"regexp"
 	"strings"
@@ -85,15 +86,13 @@ func (g *SettingGroup) compilePattern() {
 	var err error
 	g.compiled,err = regexp.Compile(g.pattern)
 	if err != nil {
-		fmt.Printf("Failed to compile pattern for group %s: /%s/\n",g.name,g.pattern)
-		os.Exit(-1)
+		log.Fatalf("Failed to compile pattern for group %s: /%s/: %s\n",g.name,g.pattern,err.Error())
 	}
 }
 
 func compilePatterns() {
 	if settingGroups == nil {
-		fmt.Printf("SettingGroups not initialized!\n")
-		os.Exit(-1)
+		log.Fatalf("SettingGroups not initialized!\n")
 	}
 	for _,group := range settingGroups {
 		group.compilePattern()
@@ -115,13 +114,16 @@ func usage() {
 	os.Exit(0)
 }
 
+func fatalError(s string,err error) {
+	if err != nil {
+		log.Fatalf("%s: %s\n",s,err.Error())
+	}
+}
+
 func parseKeyValue(s string) (key,value string) {
 	if keyvaluePattern == nil {
 		pattern,err := regexp.Compile("^(\\w+)(=(\\w+))?$")
-		if err != nil {
-			fmt.Println("Error in parsing key=value regular expression: ",err.Error())
-			os.Exit(-1)
-		}
+		fatalError("Error in parsing key=value regular expression",err)
 		keyvaluePattern = pattern
 	}
 	if !keyvaluePattern.MatchString(s) {
@@ -139,10 +141,7 @@ func parseKeyValue(s string) (key,value string) {
 func parseGroupKeyValue(s string) (group,key,value string) {
 	if groupPattern == nil {
 		pattern,err := regexp.Compile("^(\\w+)\\.(\\w+)(=([ -~]+))?$")
-		if err != nil {
-			fmt.Println("Error in parsing special key=value regular expression: ",err.Error())
-			os.Exit(-1)
-		}
+		fatalError("Error in parsing group key=value regular expression",err)
 		groupPattern = pattern
 	}
 	if !groupPattern.MatchString(s) {
@@ -161,10 +160,7 @@ func parseGroupKeyValue(s string) (group,key,value string) {
 func parseSpecialKeyValue(s string) (key,value string) {
 	if specialPattern == nil {
 		pattern,err := regexp.Compile("^(\\w+)(=([ -~]*))?$")
-		if err != nil {
-			fmt.Println("Error in parsing special key=value regular expression: ",err.Error())
-			os.Exit(-1)
-		}
+		fatalError("Error in parsing special key=value regular expression",err)
 		specialPattern = pattern
 	}
 	if !specialPattern.MatchString(s) {
@@ -182,10 +178,7 @@ func parseSpecialKeyValue(s string) (key,value string) {
 func parseGroupLabel(s string) (label string) {
 	if labelPattern == nil {
 		pattern,err := regexp.Compile("^\\[(\\w+)\\]$")
-		if err != nil {
-			fmt.Println("Error in parsing special label regular expression: ",err.Error())
-			os.Exit(-1)
-		}
+		fatalError("Error in parsing special label regular expression",err)
 		labelPattern = pattern
 	}
 	if !labelPattern.MatchString(s) {
@@ -202,10 +195,7 @@ func parseGroupLabel(s string) (label string) {
 func parseComment(s string) (ret string) {
 	if commentPattern == nil {
 		pattern,err := regexp.Compile("^\\s*([^#]*)\\s*(#(.*))?$")
-		if err != nil {
-			fmt.Println("Error in parsing comment regular expression: ",err.Error())
-			os.Exit(-1)
-		}
+		fatalError("Error in parsing comment regular expression",err)
 		commentPattern = pattern
 	}
 	if !commentPattern.MatchString(s) {
@@ -227,14 +217,12 @@ func set() {
 	configArg := flag.Arg(1)
 	name,key,value := parseGroupKeyValue(configArg)
 	if name == "" || key == "" {
-		fmt.Println("Invalid group.key/value pair!")
-		os.Exit(-1)
+		log.Fatal("Invalid group.key/value pair!")
 	}
 	if value == "" {
 		settingGroup,ok := settingGroups[name]
 		if !ok {
-			fmt.Printf("Group not exist: %s\n",name)
-			os.Exit(-1)
+			log.Fatalf("Group not exist: %s\n",name)
 		}
 		value,ok = settingGroup.get(key)
 		if ok {
@@ -270,8 +258,7 @@ func start() {
 		startTime = flag.Arg(2)
 		tmp,ok := schedule.GetFullTime(startTime)
 		if !ok {
-			fmt.Printf("Invalid time: %s\n",flag.Arg(2))
-			os.Exit(-1)
+			log.Fatalf("Invalid time: %s\n",flag.Arg(2))
 		}
 		startTime = tmp
 	}
@@ -290,8 +277,7 @@ func start() {
 			}
 		}
 	} else if !os.IsNotExist(err) {
-		fmt.Printf("Error in reading start file: %s\n",err.Error())
-		os.Exit(-1)
+		log.Fatalf("Error in reading start file: %s\n",err.Error())
 	}
 	item := schedule.ScheduleItemNow(content)
 	if startTime != "" {
@@ -300,10 +286,7 @@ func start() {
 	fmt.Printf("Started: %s\n",item.ContentString())
 	fmt.Printf("Time: %s\n",item.StartString())
 	err = ioutil.WriteFile(startPath,[]byte(item.String()),0644)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(-1)
-	}
+	fatalError("Error in writing settings file",err)
 }
 
 func finish() {
@@ -313,26 +296,21 @@ func finish() {
 		finishTime = flag.Arg(1)
 		tmp,ok := schedule.GetFullTime(finishTime)
 		if !ok {
-			fmt.Printf("Invalid time: %s\n",flag.Arg(1))
-			os.Exit(-1)
+			log.Fatalf("Invalid time: %s\n",flag.Arg(1))
 		}
 		finishTime = tmp
 	}
 	startFile,err := ioutil.ReadFile(startPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Printf("Error in reading start file: %s\n",err.Error())
-			os.Exit(-1)
+			log.Fatalf("Error in reading start file: %s\n",err.Error())
 		} else {
 			prolongFinish(finishTime)
 		}
 	} else {
 		startString := strings.Trim(string(startFile),"\n")
 		item,err := schedule.ScheduleItemFromString(startString)
-		if err != nil {
-			fmt.Printf("Start file corrupted: %s\n",startPath)
-			os.Exit(-1)
-		}
+		fatalError("Start file corrupted: "+startPath,err)
 		fmt.Printf("Going to finish task: %s\n",item.ContentString())
 		fmt.Printf("Started at time: %s\n",item.StartString())
 		fmt.Printf("Proceed? (Y/n)")
@@ -350,30 +328,20 @@ func finish() {
 			fmt.Printf("Going to finish at %s\n",schedule.GetNowString())
 		}
 		if !ok {
-			fmt.Printf("Failed to set finish time!\n")
-			os.Exit(-1)
+			log.Fatalf("Failed to set finish time!\n")
 		}
 		day := item.StartDayString()
 		schedulePath := filepath.Join(path,day)
 		scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
-		if err != nil {
-			fmt.Printf("Error reading schedule file: %s: %s",schedulePath,err.Error())
-			os.Exit(-1)
-		}
+		fatalError("Error reading schedule file: "+schedulePath,err)
 		scheduleGroup.Add(item)
 		err = ioutil.WriteFile(schedulePath,[]byte(scheduleGroup.StringOfDay(day)),0644)
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(-1)
-		}
+		fatalError("Error writing schedule file",err)
 		duration,_ := item.DurationString()
 		fmt.Printf("Finished at time: %s\n",item.FinishString())
 		fmt.Printf("Duration: %s\n",duration)
 		err = os.Remove(startPath)
-		if err != nil {
-			fmt.Println(err.Error())
-			os.Exit(-1)
-		}
+		fatalError("Error removing starting file",err)
 	}
 }
 
@@ -386,23 +354,19 @@ func prolongFinish(newtime string) {
 		scheduleGroup,err := schedule.ScheduleGroupFromFile(schedulePath)
 		if err != nil || scheduleGroup.Empty() {
 			if err != nil && !os.IsNotExist(err) {
-				fmt.Println(err.Error())
-				os.Exit(-1)
+				log.Fatalf(err.Error())
 			}
 			schedulePath := filepath.Join(path,yesterday)
 			scheduleGroup,err = schedule.ScheduleGroupFromFile(schedulePath)
 			if err != nil || scheduleGroup.Empty() {
 				if err != nil {
 					if !os.IsNotExist(err) {
-						fmt.Println(err.Error())
-						os.Exit(-1)
+						log.Fatalf(err.Error())
 					} else {
-						fmt.Println("Cannot prolong task started too long ago!\n")
-						os.Exit(-1)
+						log.Fatal("Cannot prolong task started too long ago!\n")
 					}
 				}
-				fmt.Println("Cannot prolong task started too long ago!\n")
-				os.Exit(-1)
+				log.Fatal("Cannot prolong task started too long ago!\n")
 			}
 			day = yesterday
 		} else {
@@ -411,20 +375,15 @@ func prolongFinish(newtime string) {
 	} else {
 		newday,ok := schedule.GetDayString(newtime)
 		if !ok {
-			fmt.Printf("Invalid finish time %s\n",newtime)
-			os.Exit(-1)
+			log.Fatalf("Invalid finish time %s\n",newtime)
 		}
 		day = newday
 	}
 	schedulePath := filepath.Join(path,day)
 	scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
-	if err != nil {
-		fmt.Printf("Error reading schedule file: %s: %s\n",schedulePath,err.Error())
-		os.Exit(-1)
-	}
+	fatalError("Error reading schedule file: "+schedulePath,err)
 	if scheduleGroup.Empty() {
-		fmt.Printf("Empty schedule file: %s\n",schedulePath)
-		os.Exit(-1)
+		log.Fatalf("Empty schedule file: %s\n",schedulePath)
 	}
 	item,_ := scheduleGroup.GetLast()
 	fmt.Printf("No started schedule! Have to prolong the last item.\n")
@@ -449,10 +408,7 @@ func prolongFinish(newtime string) {
 	scheduleGroup.RemoveLast()
 	scheduleGroup.Add(item)
 	err = ioutil.WriteFile(schedulePath,[]byte(scheduleGroup.StringOfDay(day)),0644)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(-1)
-	}
+	fatalError("Error writing schedule file",err)
 	duration,_ := item.DurationString()
 	fmt.Printf("Update finish time to: %s\n",item.FinishString())
 	fmt.Printf("Duration: %s\n",duration)
@@ -554,10 +510,7 @@ func serializedSettingGroups() (groups []*SettingGroup) {
 func readScheduleGroupByDay(day string) *schedule.ScheduleGroup {
 	schedulePath := filepath.Join(path,day)
 	scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
-	if err != nil {
-		fmt.Printf("Error reading schedule of day %s: %s\n",day,err.Error())
-		os.Exit(-1)
-	}
+	fatalError("Error reading schedule of day "+day,err)
 	return scheduleGroup
 }
 
@@ -583,16 +536,13 @@ func evalDayPairByCommand(startDay,toDay string) (start,to string) {
 	start,ok1 = evalDay(startDay)
 	to,ok2 = evalDay(toDay)
 	if !ok1 {
-		fmt.Printf("Invalid start day: %s\n",startDay)
-		os.Exit(-1)
+		log.Fatal("Invalid start day: %s\n",startDay)
 	}
 	if !ok2 {
-		fmt.Printf("Invalid end day: %s\n",toDay)
-		os.Exit(-1)
+		log.Fatalf("Invalid end day: %s\n",toDay)
 	}
 	if !schedule.DayNotAfterString(start,to) {
-		fmt.Println("Start day is later than end day!")
-		os.Exit(-1)
+		log.Fatal("Start day is later than end day!")
 	}
 	return
 }
@@ -617,8 +567,7 @@ func readConfig() {
 	configFile,err := ioutil.ReadFile(configPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Println(err.Error())
-			os.Exit(-1)
+			log.Fatalf(err.Error())
 		}
 		if verboseLevel > 0 {
 			fmt.Printf("Config file %s not exist, use default configuration\n",configPath)
@@ -634,8 +583,7 @@ func readConfig() {
 		}
 		key,value := parseKeyValue(line)
 		if key == "" {
-			fmt.Printf("Invalid configuration in %s: %d\n",CONFIG_FILE,i+1)
-			os.Exit(-1)
+			log.Fatalf("Invalid configuration in %s: %d\n",CONFIG_FILE,i+1)
 		}
 		configuration[key] = value
 	}
@@ -650,8 +598,7 @@ func readSetting() {
 	settingFile,err := ioutil.ReadFile(settingPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			fmt.Println(err.Error())
-			os.Exit(-1)
+			log.Fatalf(err.Error())
 		}
 		if verboseLevel > 0 {
 			fmt.Printf("Setting file %s not exist, use default setting \n",settingPath)
@@ -684,8 +631,7 @@ func readSetting() {
 			}
 			continue
 		}
-		fmt.Printf("Invalid setting in '%s:%d'\n",SETTING_FILE,i+1)
-		os.Exit(-1)
+		log.Fatalf("Invalid setting in '%s:%d'\n",SETTING_FILE,i+1)
 	}
 }
 
@@ -696,10 +642,7 @@ func saveSetting() {
 		settings += group.String()
 	}
 	err := ioutil.WriteFile(settingPath,[]byte(settings),0644)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(-1)
-	}
+	fatalError("Error writing settings file",err)
 }
 
 func setPath() {
