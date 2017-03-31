@@ -4,6 +4,7 @@ import (
 	"os"
 	"flag"
 	"fmt"
+	"sort"
 	"regexp"
 	"strings"
 	"schedule"
@@ -484,6 +485,7 @@ func stat() {
 	startDay,_ := schedule.DayAddString(toDay,-statLength)
 	startDay,toDay = evalDayPairByCommand(startDay,toDay)
 	totalMinutes := 0
+	startCount := false
 	for day,err := startDay,error(nil); schedule.DayNotAfterString(day,toDay);
 			day,err = schedule.TomorrowString(day) {
 		if err != nil {
@@ -502,11 +504,21 @@ func stat() {
 				}
 			}
 		}
-		totalMinutes += MINUTES_IN_A_DAY
+		if !startCount {
+			if !scheduleGroup.Empty() {
+				startCount = true
+				startDay = day
+			}
+		}
+		if startCount {
+			totalMinutes += MINUTES_IN_A_DAY
+		}
 	}
 	sum := 0
 	fmt.Printf("Statistics from %s to %s:\n",startDay,toDay)
-	for name,group := range settingGroups {
+	sortedSettingGroups := serializedSettingGroups()
+	for _,group := range sortedSettingGroups {
+		name := group.name
 		sum += group.minute
 		if group.minute == 0 {
 			fmt.Printf("  %10s:\n",name)
@@ -518,6 +530,25 @@ func stat() {
 	}
 	fmt.Printf("  %10s: %5d hours %2d minutes\n","Sum",sum/60,sum%60)
 	fmt.Printf("  %10s: %5d hours %2d minutes\n","Total",totalMinutes/60,totalMinutes%60)
+}
+
+func serializedSettingGroups() (groups []*SettingGroup) {
+	groups = make([]*SettingGroup,len(settingGroups))
+	i := 0
+	for _,group := range settingGroups {
+		groups[i] = group
+		i += 1
+	}
+	sort.SliceStable(groups,func (i,j int) bool {
+		if groups[i].minute > groups[j].minute {
+			return true
+		} else if groups[i].minute < groups[j].minute {
+			return false
+		} else {
+			return groups[i].name < groups[j].name
+		}
+	})
+	return groups
 }
 
 func readScheduleGroupByDay(day string) *schedule.ScheduleGroup {
@@ -661,7 +692,7 @@ func readSetting() {
 func saveSetting() {
 	settingPath := filepath.Join(path,SETTING_FILE)
 	settings := ""
-	for _,group := range settingGroups {
+	for _,group := range serializedSettingGroups() {
 		settings += group.String()
 	}
 	err := ioutil.WriteFile(settingPath,[]byte(settings),0644)
