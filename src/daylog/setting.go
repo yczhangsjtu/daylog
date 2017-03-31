@@ -54,3 +54,12 @@ func (g *SettingGroup) compilePattern() {
 	}
 }
 
+func (g *SettingGroup) printTime() {
+	if g.minute == 0 {
+		fmt.Printf("%12s:\n",g.name)
+	} else if g.minute < 60 {
+		fmt.Printf("%12s:             %2d minutes\n",g.name,g.minute)
+	} else {
+		fmt.Printf("%12s: %5d hours %2d minutes\n",g.name,g.minute/60,g.minute%60)
+	}
+}

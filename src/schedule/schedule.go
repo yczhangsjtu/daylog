@@ -252,6 +252,13 @@ func (item *ScheduleItem) String() string {
 	return fmt.Sprintf("%s %s %s",item.StartString(),item.FinishString(),item.content)
 }
 
+func (item *ScheduleItem) Print() {
+	duration,_ := item.DurationString()
+	duration = fmt.Sprintf("(%s)",duration)
+	fmt.Printf("  From %s to %s %8s: %s\n",
+		item.StartString(),item.FinishString(),duration,item.ContentString())
+}
+
 func (item *ScheduleItem) StartString() string {
 	if item.start != nil {
 		return item.start.Format(FORMAT)

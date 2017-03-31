@@ -39,3 +39,16 @@ func evalDay(day string) (string,bool) {
 	}
 	return day,false
 }
+
+func RangeDay(startDay,toDay string) []string {
+	ret := []string{}
+	if !schedule.DayNotAfterString(startDay,toDay) {
+		return ret
+	}
+	for day,err := startDay,error(nil); schedule.DayNotAfterString(day,toDay);
+			day,err = schedule.TomorrowString(day) {
+		fatalError("Error processing day "+day,err)
+		ret = append(ret,day)
+	}
+	return ret
+}

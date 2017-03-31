@@ -36,20 +36,9 @@ var configuration map[string]string
 
 var settingGroups map[string]*SettingGroup
 
-func compilePatterns() {
-	if settingGroups == nil {
-		log.Fatalf("SettingGroups not initialized!\n")
-	}
-	for _,group := range settingGroups {
-		group.compilePattern()
-	}
-}
-
-func usage() {
-	fmt.Println("Usage: daylog [global options] command [arguments]")
-	flag.PrintDefaults()
-	os.Exit(0)
-}
+/**************
+ * Operations *
+ **************/
 
 func set() {
 	if flag.NArg() != 2 || flag.Arg(1) == "help" {
@@ -260,19 +249,12 @@ func list() {
 	startDay := "yesterday"
 	toDay := "today"
 	startDay,toDay = evalDayPairByCommand(startDay,toDay)
-	for day,err := startDay,error(nil); schedule.DayNotAfterString(day,toDay);
-			day,err = schedule.TomorrowString(day) {
-		if err != nil {
-			fmt.Printf("Error processing day %s: %s\n",day,err.Error())
-		}
+	for _,day := range RangeDay(startDay,toDay) {
 		scheduleGroup := readScheduleGroupByDay(day)
 		fmt.Printf("Day %s\n",day)
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
-			duration,_ := item.DurationString()
-			duration = fmt.Sprintf("(%s)",duration)
-			fmt.Printf("  From %s to %s %8s: %s\n",
-				item.StartString(),item.FinishString(),duration,item.ContentString())
+			item.Print()
 		}
 	}
 }
@@ -284,29 +266,21 @@ func stat() {
 	startDay,toDay = evalDayPairByCommand(startDay,toDay)
 	totalMinutes := 0
 	startCount := false
-	for day,err := startDay,error(nil); schedule.DayNotAfterString(day,toDay);
-			day,err = schedule.TomorrowString(day) {
-		if err != nil {
-			fmt.Printf("Error processing day %s: %s\n",day,err.Error())
-		}
+	compilePatterns()
+	for _,day := range RangeDay(startDay,toDay) {
 		scheduleGroup := readScheduleGroupByDay(day)
-		compilePatterns()
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
 			duration,_ := item.Duration()
 			content := item.ContentString()
-			for _,group := range settingGroups {
-				if group.compiled.MatchString(content) {
-					group.minute += duration
-					break
-				}
+			group := getItemGroup(content)
+			if group != nil {
+				group.minute += duration
 			}
 		}
-		if !startCount {
-			if !scheduleGroup.Empty() {
-				startCount = true
-				startDay = day
-			}
+		if !startCount && !scheduleGroup.Empty() {
+			startCount = true
+			startDay = day
 		}
 		if startCount {
 			totalMinutes += MINUTES_IN_A_DAY
@@ -314,20 +288,40 @@ func stat() {
 	}
 	sum := 0
 	fmt.Printf("Statistics from %s to %s:\n",startDay,toDay)
-	sortedSettingGroups := serializedSettingGroups()
-	for _,group := range sortedSettingGroups {
-		name := group.name
+	for _,group := range serializedSettingGroups() {
 		sum += group.minute
-		if group.minute == 0 {
-			fmt.Printf("  %10s:\n",name)
-		} else if group.minute < 60 {
-			fmt.Printf("  %10s:             %2d minutes\n",name,group.minute)
-		} else {
-			fmt.Printf("  %10s: %5d hours %2d minutes\n",name,group.minute/60,group.minute%60)
+		group.printTime()
+	}
+	fmt.Printf("%12s: %5d hours %2d minutes\n","Sum",sum/60,sum%60)
+	fmt.Printf("%12s: %5d hours %2d minutes\n","Total",totalMinutes/60,totalMinutes%60)
+}
+
+/******************
+ * Tool functions *
+ ******************/
+
+func getItemGroup(content string) *SettingGroup {
+	for _,group := range settingGroups {
+		if group.compiled.MatchString(content) {
+			return group
 		}
 	}
-	fmt.Printf("  %10s: %5d hours %2d minutes\n","Sum",sum/60,sum%60)
-	fmt.Printf("  %10s: %5d hours %2d minutes\n","Total",totalMinutes/60,totalMinutes%60)
+	return nil
+}
+
+func compilePatterns() {
+	if settingGroups == nil {
+		log.Fatalf("SettingGroups not initialized!\n")
+	}
+	for _,group := range settingGroups {
+		group.compilePattern()
+	}
+}
+
+func usage() {
+	fmt.Println("Usage: daylog [global options] command [arguments]")
+	flag.PrintDefaults()
+	os.Exit(0)
 }
 
 func serializedSettingGroups() (groups []*SettingGroup) {
@@ -381,6 +375,10 @@ func evalDayPairByCommand(startDay,toDay string) (start,to string) {
 	}
 	return
 }
+
+/**************************
+ * Handle global settings *
+ **************************/
 
 func readConfig() {
 	configuration = make(map[string]string)
@@ -459,16 +457,6 @@ func readSetting() {
 	}
 }
 
-func saveSetting() {
-	settingPath := filepath.Join(path,SETTING_FILE)
-	settings := ""
-	for _,group := range serializedSettingGroups() {
-		settings += group.String()
-	}
-	err := ioutil.WriteFile(settingPath,[]byte(settings),0644)
-	fatalError("Error writing settings file",err)
-}
-
 func setPath() {
 	path,ok = os.LookupEnv("DAYLOG_PATH")
 	if !ok {
@@ -477,6 +465,16 @@ func setPath() {
 	if verboseLevel > 0 {
 		fmt.Println("Base path set to: ",path)
 	}
+}
+
+func saveSetting() {
+	settingPath := filepath.Join(path,SETTING_FILE)
+	settings := ""
+	for _,group := range serializedSettingGroups() {
+		settings += group.String()
+	}
+	err := ioutil.WriteFile(settingPath,[]byte(settings),0644)
+	fatalError("Error writing settings file",err)
 }
 
 func parseGlobalOptions() {
@@ -495,6 +493,9 @@ func parseGlobalOptions() {
 	}
 }
 
+/********
+ * main *
+ ********/
 func main() {
 	parseGlobalOptions()
 	setPath()
