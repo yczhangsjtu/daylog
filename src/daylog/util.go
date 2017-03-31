@@ -2,9 +2,11 @@ package main
 
 import (
 	"log"
+	"os"
 	"os/user"
 	"path/filepath"
 	"schedule"
+	"bufio"
 )
 
 func EvalPath(p string) string {
@@ -20,6 +22,16 @@ func fatalError(s string,err error) {
 	if err != nil {
 		log.Fatalf("%s: %s\n",s,err.Error())
 	}
+}
+
+func fatalTrue(b bool,s string) {
+	if b {
+		log.Fatal(s)
+	}
+}
+
+func fatalFalse(b bool,s string) {
+	fatalTrue(!b,s)
 }
 
 func readScheduleGroupByDay(day string) *schedule.ScheduleGroup {
@@ -51,4 +63,27 @@ func RangeDay(startDay,toDay string) []string {
 		ret = append(ret,day)
 	}
 	return ret
+}
+
+func ExpandTime(s string) string {
+	t,ok := schedule.GetFullTime(s)
+	if !ok {
+		log.Fatalf("Invalid time: %s\n",s)
+	}
+	return t
+}
+
+func UserProceed(deft bool) bool {
+	stdin := bufio.NewReader(os.Stdin)
+	c,_ := stdin.ReadString('\n')
+	if c == "" {
+		return deft
+	}
+	if c[0] != 'y' && c[0] != 'Y' {
+		return false
+	}
+	if c[0] != 'n' && c[0] != 'N' {
+		return true
+	}
+	return deft
 }

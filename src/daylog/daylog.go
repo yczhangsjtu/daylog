@@ -30,6 +30,7 @@ const (
 var verboseLevel int
 var verbose bool
 var path string
+var startPath string
 var ok bool
 
 var configuration map[string]string
@@ -45,11 +46,8 @@ func set() {
 		fmt.Println(SETTING_USAGE)
 		os.Exit(0)
 	}
-	configArg := flag.Arg(1)
-	name,key,value := parseGroupKeyValue(configArg)
-	if name == "" || key == "" {
-		log.Fatal("Invalid group.key/value pair!")
-	}
+	name,key,value := parseGroupKeyValue(flag.Arg(1))
+	fatalTrue(name == "" || key == "","Invalid group.key/value pair!")
 	if value == "" {
 		settingGroup,ok := settingGroups[name]
 		if !ok {
@@ -79,19 +77,13 @@ func set() {
 }
 
 func start() {
-	startPath := filepath.Join(path,START_FILE)
 	content := ""
 	startTime := ""
 	if flag.NArg() > 1 {
 		content = flag.Arg(1)
 	}
 	if flag.NArg() > 2 {
-		startTime = flag.Arg(2)
-		tmp,ok := schedule.GetFullTime(startTime)
-		if !ok {
-			log.Fatalf("Invalid time: %s\n",flag.Arg(2))
-		}
-		startTime = tmp
+		startTime = ExpandTime(flag.Arg(2))
 	}
 	startFile,err := ioutil.ReadFile(startPath)
 	if err == nil {
@@ -101,9 +93,7 @@ func start() {
 			fmt.Printf("Task already started: %s\n",item.ContentString())
 			fmt.Printf("At Time: %s\n",item.StartString())
 			fmt.Printf("Want to override it? (y/N)")
-			stdin := bufio.NewReader(os.Stdin)
-			c,_ := stdin.ReadString('\n')
-			if c == "" || (c[0] != 'y' && c[0] != 'Y') {
+			if !UserProceed(false) {
 				return
 			}
 		}
@@ -121,15 +111,9 @@ func start() {
 }
 
 func finish() {
-	startPath := filepath.Join(path,START_FILE)
 	finishTime := ""
 	if flag.NArg() > 1 {
-		finishTime = flag.Arg(1)
-		tmp,ok := schedule.GetFullTime(finishTime)
-		if !ok {
-			log.Fatalf("Invalid time: %s\n",flag.Arg(1))
-		}
-		finishTime = tmp
+		finishTime = ExpandTime(flag.Arg(1))
 	}
 	startFile,err := ioutil.ReadFile(startPath)
 	if err != nil {
@@ -138,42 +122,35 @@ func finish() {
 		} else {
 			prolongFinish(finishTime)
 		}
-	} else {
-		startString := strings.Trim(string(startFile),"\n")
-		item,err := schedule.ScheduleItemFromString(startString)
-		fatalError("Start file corrupted: "+startPath,err)
-		fmt.Printf("Going to finish task: %s\n",item.ContentString())
-		fmt.Printf("Started at time: %s\n",item.StartString())
-		fmt.Printf("Proceed? (Y/n)")
-		stdin := bufio.NewReader(os.Stdin)
-		c,_ := stdin.ReadString('\n')
-		if c != "" && (c[0] == 'n' || c[0] == 'N') {
-			return
-		}
-		var ok bool
-		if finishTime != "" {
-			fmt.Printf("Going to finish at %s\n",finishTime)
-			ok = item.SetFinishString(finishTime)
-		} else {
-			ok = item.SetFinish(schedule.GetNow())
-			fmt.Printf("Going to finish at %s\n",schedule.GetNowString())
-		}
-		if !ok {
-			log.Fatalf("Failed to set finish time!\n")
-		}
-		day := item.StartDayString()
-		schedulePath := filepath.Join(path,day)
-		scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
-		fatalError("Error reading schedule file: "+schedulePath,err)
-		scheduleGroup.Add(item)
-		err = ioutil.WriteFile(schedulePath,[]byte(scheduleGroup.StringOfDay(day)),0644)
-		fatalError("Error writing schedule file",err)
-		duration,_ := item.DurationString()
-		fmt.Printf("Finished at time: %s\n",item.FinishString())
-		fmt.Printf("Duration: %s\n",duration)
-		err = os.Remove(startPath)
-		fatalError("Error removing starting file",err)
+		return
 	}
+	startString := strings.Trim(string(startFile),"\n")
+	item,err := schedule.ScheduleItemFromString(startString)
+	fatalError("Start file corrupted: "+startPath,err)
+	fmt.Printf("Going to finish task: %s\n",item.ContentString())
+	fmt.Printf("Started at time: %s\n",item.StartString())
+	fmt.Printf("Proceed? (Y/n)")
+	if !UserProceed(true) {
+		return
+	}
+	if finishTime == "" {
+		finishTime = schedule.GetNowString()
+	}
+	fmt.Printf("Going to finish at %s\n",finishTime)
+	ok := item.SetFinishString(finishTime)
+	fatalFalse(ok,"Failed to set finish time!")
+	day := item.StartDayString()
+	schedulePath := filepath.Join(path,day)
+	scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
+	fatalError("Error reading schedule file: "+schedulePath,err)
+	scheduleGroup.Add(item)
+	err = ioutil.WriteFile(schedulePath,[]byte(scheduleGroup.StringOfDay(day)),0644)
+	fatalError("Error writing schedule file",err)
+	duration,_ := item.DurationString()
+	fmt.Printf("Finished at time: %s\n",item.FinishString())
+	fmt.Printf("Duration: %s\n",duration)
+	err = os.Remove(startPath)
+	fatalError("Error removing starting file",err)
 }
 
 func prolongFinish(newtime string) {
@@ -465,6 +442,7 @@ func setPath() {
 	if verboseLevel > 0 {
 		fmt.Println("Base path set to: ",path)
 	}
+	startPath = filepath.Join(path,START_FILE)
 }
 
 func saveSetting() {
