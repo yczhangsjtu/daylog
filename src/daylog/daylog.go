@@ -12,7 +12,6 @@ import (
 	"bufio"
 	"path/filepath"
 	"io/ioutil"
-	"os/user"
 )
 
 const (
@@ -34,11 +33,6 @@ var path string
 var ok bool
 
 var configuration map[string]string
-var keyvaluePattern *regexp.Regexp = nil
-var specialPattern *regexp.Regexp = nil
-var commentPattern *regexp.Regexp = nil
-var labelPattern *regexp.Regexp = nil
-var groupPattern *regexp.Regexp = nil
 
 var settingGroups map[string]*SettingGroup
 
@@ -51,114 +45,10 @@ func compilePatterns() {
 	}
 }
 
-func EvalPath(p string) string {
-	if p[:2] == "~/" {
-		usr,_ := user.Current()
-		dir := usr.HomeDir
-		return filepath.Join(dir,p[2:])
-	}
-	return p
-}
-
 func usage() {
 	fmt.Println("Usage: daylog [global options] command [arguments]")
 	flag.PrintDefaults()
 	os.Exit(0)
-}
-
-func fatalError(s string,err error) {
-	if err != nil {
-		log.Fatalf("%s: %s\n",s,err.Error())
-	}
-}
-
-func parseKeyValue(s string) (key,value string) {
-	if keyvaluePattern == nil {
-		pattern,err := regexp.Compile("^(\\w+)(=(\\w+))?$")
-		fatalError("Error in parsing key=value regular expression",err)
-		keyvaluePattern = pattern
-	}
-	if !keyvaluePattern.MatchString(s) {
-		return "",""
-	}
-	pair := keyvaluePattern.FindStringSubmatch(s)
-	if len(pair) != 4 {
-		return "",""
-	}
-	key = pair[1]
-	value = pair[3]
-	return
-}
-
-func parseGroupKeyValue(s string) (group,key,value string) {
-	if groupPattern == nil {
-		pattern,err := regexp.Compile("^(\\w+)\\.(\\w+)(=([ -~]+))?$")
-		fatalError("Error in parsing group key=value regular expression",err)
-		groupPattern = pattern
-	}
-	if !groupPattern.MatchString(s) {
-		return "","",""
-	}
-	pair := groupPattern.FindStringSubmatch(s)
-	if len(pair) != 5 {
-		return "","",""
-	}
-	group = pair[1]
-	key = pair[2]
-	value = pair[4]
-	return
-}
-
-func parseSpecialKeyValue(s string) (key,value string) {
-	if specialPattern == nil {
-		pattern,err := regexp.Compile("^(\\w+)(=([ -~]*))?$")
-		fatalError("Error in parsing special key=value regular expression",err)
-		specialPattern = pattern
-	}
-	if !specialPattern.MatchString(s) {
-		return "",""
-	}
-	pair := specialPattern.FindStringSubmatch(s)
-	if len(pair) != 4 {
-		return "",""
-	}
-	key = pair[1]
-	value = pair[3]
-	return
-}
-
-func parseGroupLabel(s string) (label string) {
-	if labelPattern == nil {
-		pattern,err := regexp.Compile("^\\[(\\w+)\\]$")
-		fatalError("Error in parsing special label regular expression",err)
-		labelPattern = pattern
-	}
-	if !labelPattern.MatchString(s) {
-		return ""
-	}
-	groups := labelPattern.FindStringSubmatch(s)
-	if len(groups) != 2 {
-		return ""
-	}
-	label = groups[1]
-	return
-}
-
-func parseComment(s string) (ret string) {
-	if commentPattern == nil {
-		pattern,err := regexp.Compile("^\\s*([^#]*)\\s*(#(.*))?$")
-		fatalError("Error in parsing comment regular expression",err)
-		commentPattern = pattern
-	}
-	if !commentPattern.MatchString(s) {
-		return ""
-	}
-	groups := commentPattern.FindStringSubmatch(s)
-	if len(groups) != 4 {
-		return ""
-	}
-	ret = strings.TrimSpace(groups[1])
-	return
 }
 
 func set() {
@@ -459,13 +349,6 @@ func serializedSettingGroups() (groups []*SettingGroup) {
 	return groups
 }
 
-func readScheduleGroupByDay(day string) *schedule.ScheduleGroup {
-	schedulePath := filepath.Join(path,day)
-	scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
-	fatalError("Error reading schedule of day "+day,err)
-	return scheduleGroup
-}
-
 func statDayFromConfiguration() int {
 	var statLength int
 	statLengthS,ok := configuration["stat_day"]
@@ -497,17 +380,6 @@ func evalDayPairByCommand(startDay,toDay string) (start,to string) {
 		log.Fatal("Start day is later than end day!")
 	}
 	return
-}
-
-func evalDay(day string) (string,bool) {
-	if day == "today" {
-		return schedule.GetTodayString(),true
-	} else if day == "yesterday" {
-		return schedule.GetYesterdayString(),true
-	} else {
-		return schedule.FullDayString(day)
-	}
-	return day,false
 }
 
 func readConfig() {
