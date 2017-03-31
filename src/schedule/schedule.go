@@ -38,6 +38,12 @@ func GetFullTime(s string) (string,bool) {
 	if err == nil {
 		return t.Format(FORMAT),true
 	}
+	t,err = time.Parse(FORMAT_ONLY_DAY,s)
+	if err == nil {
+		now := time.Now()
+		t = time.Date(now.Year(),t.Month(),t.Day(),t.Hour(),t.Minute(),0,0,time.UTC)
+		return t.Format(FORMAT),true
+	}
 	return "",false
 }
 
@@ -91,6 +97,15 @@ func TomorrowString(s string) (string,error) {
 		return s,err
 	}
 	day = day.AddDate(0,0,1)
+	return day.Format(FORMAT_DAY),nil
+}
+
+func DayAddString(s string,d int) (string,error) {
+	day,err := time.Parse(FORMAT_DAY,s)
+	if err != nil {
+		return s,err
+	}
+	day = day.AddDate(0,0,d)
 	return day.Format(FORMAT_DAY),nil
 }
 

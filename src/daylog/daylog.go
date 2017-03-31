@@ -21,6 +21,11 @@ const (
 	START_FILE = "start"
 )
 
+const (
+	DEFAULT_STAT_DAY int = 7
+	MINUTES_IN_A_DAY = 1440
+)
+
 var verboseLevel int
 var verbose bool
 var path string
@@ -38,12 +43,14 @@ type SettingGroup struct {
 	label string
 	color string
 	pattern string
+	minute int
+	compiled *regexp.Regexp
 }
 
 var settingGroups map[string]*SettingGroup
 
 func NewSettingGroup(name string) (g *SettingGroup) {
-	g = &SettingGroup{name,name,"",""}
+	g = &SettingGroup{name,name,"","",0,nil}
 	return
 }
 
@@ -71,6 +78,25 @@ func (g *SettingGroup) get(key string) (v string,ok bool) {
 
 func (g *SettingGroup) String() string {
 	return fmt.Sprintf("[%s]\nlabel=%s\ncolor=%s\npattern=%s\n",g.name,g.label,g.color,g.pattern)
+}
+
+func (g *SettingGroup) compilePattern() {
+	var err error
+	g.compiled,err = regexp.Compile(g.pattern)
+	if err != nil {
+		fmt.Printf("Failed to compile pattern for group %s: /%s/\n",g.name,g.pattern)
+		os.Exit(-1)
+	}
+}
+
+func compilePatterns() {
+	if settingGroups == nil {
+		fmt.Printf("SettingGroups not initialized!\n")
+		os.Exit(-1)
+	}
+	for _,group := range settingGroups {
+		group.compilePattern()
+	}
 }
 
 func EvalPath(p string) string {
@@ -434,39 +460,13 @@ func prolongFinish(newtime string) {
 func list() {
 	startDay := "yesterday"
 	toDay := "today"
-	if flag.NArg() > 1 {
-		startDay = flag.Arg(1)
-		toDay = startDay
-	}
-	if flag.NArg() > 2 {
-		toDay = flag.Arg(2)
-	}
-	var ok1,ok2 bool
-	startDay,ok1 = evalDay(startDay)
-	toDay,ok2 = evalDay(toDay)
-	if !ok1 {
-		fmt.Printf("Invalid start day: %s\n",startDay)
-		os.Exit(-1)
-	}
-	if !ok2 {
-		fmt.Printf("Invalid end day: %s\n",toDay)
-		os.Exit(-1)
-	}
-	if !schedule.DayNotAfterString(startDay,toDay) {
-		fmt.Println("Start day is later than end day!")
-		os.Exit(-1)
-	}
+	startDay,toDay = evalDayPairByCommand(startDay,toDay)
 	for day,err := startDay,error(nil); schedule.DayNotAfterString(day,toDay);
 			day,err = schedule.TomorrowString(day) {
 		if err != nil {
 			fmt.Printf("Error processing day %s: %s\n",day,err.Error())
 		}
-		schedulePath := filepath.Join(path,day)
-		scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
-		if err != nil {
-			fmt.Printf("Error reading schedule of day %s: %s\n",day,err.Error())
-			os.Exit(-1)
-		}
+		scheduleGroup := readScheduleGroupByDay(day)
 		fmt.Printf("Day %s\n",day)
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
@@ -476,6 +476,94 @@ func list() {
 				item.StartString(),item.FinishString(),duration,item.ContentString())
 		}
 	}
+}
+
+func stat() {
+	statLength := statDayFromConfiguration()
+	toDay := schedule.GetTodayString()
+	startDay,_ := schedule.DayAddString(toDay,-statLength)
+	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	totalMinutes := 0
+	for day,err := startDay,error(nil); schedule.DayNotAfterString(day,toDay);
+			day,err = schedule.TomorrowString(day) {
+		if err != nil {
+			fmt.Printf("Error processing day %s: %s\n",day,err.Error())
+		}
+		scheduleGroup := readScheduleGroupByDay(day)
+		compilePatterns()
+		for i := 0; i < scheduleGroup.Size(); i++ {
+			item,_ := scheduleGroup.Get(i)
+			duration,_ := item.Duration()
+			content := item.ContentString()
+			for _,group := range settingGroups {
+				if group.compiled.MatchString(content) {
+					group.minute += duration
+					break
+				}
+			}
+		}
+		totalMinutes += MINUTES_IN_A_DAY
+	}
+	sum := 0
+	fmt.Printf("Statistics from %s to %s:\n",startDay,toDay)
+	for name,group := range settingGroups {
+		sum += group.minute
+		if group.minute == 0 {
+			fmt.Printf("  %10s:\n",name)
+		} else if group.minute < 60 {
+			fmt.Printf("  %10s:             %2d minutes\n",name,group.minute)
+		} else {
+			fmt.Printf("  %10s: %5d hours %2d minutes\n",name,group.minute/60,group.minute%60)
+		}
+	}
+	fmt.Printf("  %10s: %5d hours %2d minutes\n","Sum",sum/60,sum%60)
+	fmt.Printf("  %10s: %5d hours %2d minutes\n","Total",totalMinutes/60,totalMinutes%60)
+}
+
+func readScheduleGroupByDay(day string) *schedule.ScheduleGroup {
+	schedulePath := filepath.Join(path,day)
+	scheduleGroup,err := schedule.ScheduleGroupFromPossibleFile(schedulePath)
+	if err != nil {
+		fmt.Printf("Error reading schedule of day %s: %s\n",day,err.Error())
+		os.Exit(-1)
+	}
+	return scheduleGroup
+}
+
+func statDayFromConfiguration() int {
+	var statLength int
+	statLengthS,ok := configuration["stat_day"]
+	_,err := fmt.Sscan(statLengthS,"%d",&statLength)
+	if !ok || err != nil || statLength < 0 {
+		return DEFAULT_STAT_DAY
+	}
+	return statLength
+}
+
+func evalDayPairByCommand(startDay,toDay string) (start,to string) {
+	if flag.NArg() > 1 {
+		startDay = flag.Arg(1)
+		toDay = startDay
+	}
+	if flag.NArg() > 2 {
+		toDay = flag.Arg(2)
+	}
+	var ok1,ok2 bool
+	start,ok1 = evalDay(startDay)
+	to,ok2 = evalDay(toDay)
+	if !ok1 {
+		fmt.Printf("Invalid start day: %s\n",startDay)
+		os.Exit(-1)
+	}
+	if !ok2 {
+		fmt.Printf("Invalid end day: %s\n",toDay)
+		os.Exit(-1)
+	}
+	if !schedule.DayNotAfterString(start,to) {
+		fmt.Println("Start day is later than end day!")
+		os.Exit(-1)
+	}
+	return
 }
 
 func evalDay(day string) (string,bool) {
@@ -631,6 +719,8 @@ func main() {
 		finish()
 	} else if command == "list" {
 		list()
+	} else if command == "stat" || command == "statistic" {
+		stat()
 	} else {
 		usage()
 	}
