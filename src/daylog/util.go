@@ -238,9 +238,9 @@ func fillColor(colorArray []color.Color,item *schedule.ScheduleItem,c color.Colo
 	from := item.StartMinute()
 	to := item.FinishMinute()
 	fatalTruef(from < 0 || from >= len(colorArray),"Invalid start time %d",from)
-	fatalTruef(to < 0 || to >= len(colorArray),"Invalid finish time %d",to)
+	fatalTruef(to < 0, "Invalid finish time %d",to)
 	fatalTruef(from >= to,"start >= finish")
-	for i := from; i < to; i++ {
+	for i := from; i < to && i < len(colorArray); i++ {
 		colorArray[i] = c
 	}
 }
