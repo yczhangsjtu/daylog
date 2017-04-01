@@ -60,6 +60,11 @@ func IsDayString(s string) bool {
 	return err == nil
 }
 
+func IsTimeString(s string) bool {
+	_,err := time.Parse(FORMAT,s)
+	return err == nil
+}
+
 func FullDayString(s string) (string,bool) {
 	full,ok := GetFullTime(s)
 	if !ok {
@@ -390,6 +395,14 @@ func (group *ScheduleGroup) Size() int {
 
 func (group *ScheduleGroup) Empty() bool {
 	return len(group.items) == 0
+}
+
+func (group *ScheduleGroup) SetLast(item *ScheduleItem) bool {
+	if group.Empty() {
+		return false
+	}
+	group.items[group.Size()-1] = item
+	return true
 }
 
 func (group *ScheduleGroup) RemoveLast() bool {

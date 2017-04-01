@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"fmt"
+	"sort"
 	"regexp"
 )
 
@@ -62,4 +63,46 @@ func (g *SettingGroup) printTime() {
 	} else {
 		fmt.Printf("%12s: %5d hours %2d minutes\n",g.name,g.minute/60,g.minute%60)
 	}
+}
+
+func serializedSettingGroups(settingGroups map[string]*SettingGroup) (groups []*SettingGroup) {
+	groups = make([]*SettingGroup,len(settingGroups))
+	i := 0
+	for _,group := range settingGroups {
+		groups[i] = group
+		i += 1
+	}
+	sort.SliceStable(groups,func (i,j int) bool {
+		if groups[i].minute > groups[j].minute {
+			return true
+		} else if groups[i].minute < groups[j].minute {
+			return false
+		} else {
+			return groups[i].name < groups[j].name
+		}
+	})
+	return groups
+}
+
+func tryAddingNewGroup(settingGroups map[string]*SettingGroup,label string) {
+	_,ok = settingGroups[label]
+	if !ok {
+		settingGroups[label] = NewSettingGroup(label)
+	}
+}
+
+func compilePatterns(settingGroups map[string]*SettingGroup) {
+	fatalTrue(settingGroups==nil,"SettingGroups not initialized!")
+	for _,group := range settingGroups {
+		group.compilePattern()
+	}
+}
+
+func getItemGroup(content string,settingGroups map[string]*SettingGroup) *SettingGroup {
+	for _,group := range settingGroups {
+		if group.compiled.MatchString(content) {
+			return group
+		}
+	}
+	return nil
 }
