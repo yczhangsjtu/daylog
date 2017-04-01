@@ -78,3 +78,15 @@ func TestScheduleGroupString(t *testing.T) {
 		t.Errorf("group.String() failed! Expect %s, got %s\n",expect,result)
 	}
 }
+
+func TestStartMinutes(t *testing.T) {
+	test1 := "2017.03.29/17:32 2017.03.29/17:44 Java"
+	test1item,err := ScheduleItemFromString(test1)
+	if err != nil {
+		t.Errorf("ScheduleItemFromString(test1) failed! Got error: %s\n",err.Error())
+	}
+	test1result := test1item.StartMinute()
+	if test1result != 17*60+32 {
+		t.Errorf("item.StartMinute() failed! Expect %d, got %d\n",17*60+32,test1result)
+	}
+}

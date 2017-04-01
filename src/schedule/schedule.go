@@ -307,6 +307,27 @@ func (item *ScheduleItem) Duration() (int,error) {
 	return minute,nil
 }
 
+func (item *ScheduleItem) StartDay() *time.Time {
+	t := item.start.Truncate(time.Duration(24)*time.Hour)
+	return &t
+}
+
+func (item *ScheduleItem) Start() *time.Time {
+	return item.start
+}
+
+func (item *ScheduleItem) Finish() *time.Time {
+	return item.finish
+}
+
+func (item *ScheduleItem) StartMinute() int {
+	return int(item.start.Sub(*item.StartDay()).Minutes())
+}
+
+func (item *ScheduleItem) FinishMinute() int {
+	return int(item.finish.Sub(*item.StartDay()).Minutes())
+}
+
 func (item *ScheduleItem) DurationString() (string,error) {
 	minute,err := item.Duration()
 	if err != nil {

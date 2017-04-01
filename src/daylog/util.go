@@ -10,6 +10,12 @@ import (
 	"bufio"
 	"io/ioutil"
 	"regexp"
+	"image/color"
+)
+
+const (
+	ROWS int = 15
+	COLUMNS int = MINUTES_IN_A_DAY/ROWS
 )
 
 func EvalPath(p string) string {
@@ -191,4 +197,73 @@ func TodayOrYesterday(today,yesterday,errstring string) string {
 func WriteFile(filename,data string) {
 	err := ioutil.WriteFile(filename,[]byte(data),0644)
 	fatalErrorf(err,"Error writing: %s",filename)
+}
+
+func getColor(name string) color.Color {
+	c,ok := colorMap[name]
+	fatalFalsef(ok,"Unrecognized color: %s",name)
+	return c
+}
+
+func fillColor(colorArray []color.Color,item *schedule.ScheduleItem,c color.Color) {
+	from := item.StartMinute()
+	to := item.FinishMinute()
+	fatalTruef(from < 0 || from >= len(colorArray),"Invalid start time %d",from)
+	fatalTruef(to < 0 || to >= len(colorArray),"Invalid finish time %d",to)
+	fatalTruef(from >= to,"start >= finish")
+	for i := from; i < to; i++ {
+		colorArray[i] = c
+	}
+}
+
+func printColor(c color.Color) {
+	if c == nil {
+		fmt.Printf(".")
+		return
+	}
+	if configuration["color_scheme"] == "bash" {
+		r,g,b,a := c.RGBA()
+		r,g,b,a = r>>8,g>>8,b>>8,a>>8
+		if r == 0xFF && g == 0x00 && b == 0x00 && a == 0xFF {
+			fmt.Printf("\033[0;31mo\033[0m")
+		} else if r == 0x00 && g == 0x80 && b == 0x00 && a == 0xFF {
+			fmt.Printf("\033[1;32mo\033[0m")
+		} else if r == 0x00 && g == 0x00 && b == 0xFF && a == 0xFF {
+			fmt.Printf("\033[0;34mo\033[0m")
+		} else if r == 0xFF && g == 0xFF && b == 0x00 && a == 0xFF {
+			fmt.Printf("\033[1;33mo\033[0m")
+		} else if r == 0x80 && g == 0x00 && b == 0x80 && a == 0xFF {
+			fmt.Printf("\033[0;35mo\033[0m")
+		} else {
+			fmt.Printf("o")
+		}
+	}
+}
+
+func printColorArray(colorArray []color.Color) {
+	l2r := true
+	var colorMatrix [ROWS][COLUMNS]color.Color
+	for base := 0; base < len(colorArray); base += MINUTES_IN_A_DAY {
+		length := MINUTES_IN_A_DAY
+		if base + length > len(colorArray) {
+			length = len(colorArray)-base
+		}
+		for i := 0; i < length; i++ {
+			colorMatrix[i%ROWS][i/ROWS] = colorArray[base+i]
+		}
+		for i := 0; i < ROWS; i++ {
+			if l2r {
+				for j := 0; j < COLUMNS; j++ {
+					printColor(colorMatrix[i][j])
+				}
+				fmt.Println()
+			} else {
+				for j := COLUMNS-1; j >= 0; j-- {
+					printColor(colorMatrix[i][j])
+				}
+				fmt.Println()
+			}
+		}
+		l2r = !l2r
+	}
 }

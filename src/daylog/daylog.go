@@ -9,6 +9,7 @@ import (
 	"schedule"
 	"path/filepath"
 	"io/ioutil"
+	"image/color"
 )
 
 const (
@@ -19,8 +20,9 @@ const (
 	RESTART_USAGE = "Usage: daylog [options] restart [help]|[content]|[time]"
 	CANCEL_USAGE = "Usage: daylog [options] cancel [help]"
 	FINISH_USAGE = "Usage: daylog [options] finish [help]|[time]"
-	STAT_USAGE = "Usage: daylog [options] stat [help]|[starttime [endtime]]"
-	LIST_USAGE = "Usage: daylog [options] list [help]|[starttime [endtime]]"
+	STAT_USAGE = "Usage: daylog [options] stat [help]|[startday [endday]]"
+	LIST_USAGE = "Usage: daylog [options] list [help]|[startday [endday]]"
+	PLOT_USAGE = "Usage: daylog [options] plot [help]|[startday [endday]]"
 	CONFIG_FILE = "config"
 	SETTING_FILE = "settings"
 	START_FILE = "start"
@@ -287,6 +289,32 @@ func stat() {
 	fmt.Printf("%12s: %5d hours %2d minutes\n","Total",totalMinutes/60,totalMinutes%60)
 }
 
+func plot() {
+	if flag.NArg() == 2 && flag.Arg(1) == "help" {
+		plotUsage()
+	}
+	statLength := statDayFromConfiguration()
+	toDay := schedule.GetTodayString()
+	startDay,_ := schedule.DayAddString(toDay,-statLength)
+	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	dayRange := RangeDay(startDay,toDay)
+	totalMinutes := len(dayRange)*MINUTES_IN_A_DAY
+	colorArray := make([]color.Color,totalMinutes)
+	compilePatterns(settingGroups)
+	for d,day := range dayRange {
+		scheduleGroup := readScheduleGroupByDay(day)
+		for i := 0; i < scheduleGroup.Size(); i++ {
+			item,_ := scheduleGroup.Get(i)
+			content := item.ContentString()
+			group := getItemGroup(content,settingGroups)
+			if group != nil {
+				fillColor(colorArray[d*MINUTES_IN_A_DAY:],item,getColor(group.color))
+			}
+		}
+	}
+	printColorArray(colorArray)
+}
+
 /******************
  * Tool functions *
  ******************/
@@ -330,6 +358,11 @@ func statUsage() {
 
 func listUsage() {
 	fmt.Println(LIST_USAGE)
+	os.Exit(0)
+}
+
+func plotUsage() {
+	fmt.Println(PLOT_USAGE)
 	os.Exit(0)
 }
 
@@ -479,6 +512,8 @@ func main() {
 		list()
 	} else if command == "stat" || command == "statistic" {
 		stat()
+	} else if command == "plot" {
+		plot()
 	} else {
 		usage()
 	}
