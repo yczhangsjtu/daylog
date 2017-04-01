@@ -11,6 +11,9 @@ import (
 	"io/ioutil"
 	"regexp"
 	"image/color"
+	"image/draw"
+	"image/png"
+	"image"
 )
 
 const (
@@ -265,5 +268,49 @@ func printColorArray(colorArray []color.Color) {
 			}
 		}
 		l2r = !l2r
+	}
+}
+
+func drawColorArray(colorArray []color.Color,size int,imagename string) {
+	l2r := true
+	var colorMatrix [ROWS][COLUMNS]color.Color
+	m := image.NewRGBA(image.Rect(0, 0, size*COLUMNS, size*ROWS*(len(colorArray)/MINUTES_IN_A_DAY)))
+	backgroundColor := getColor(settingGroups["global"].color)
+	draw.Draw(m,m.Bounds(),&image.Uniform{backgroundColor},image.ZP,draw.Src)
+	for base := 0; base < len(colorArray); base += MINUTES_IN_A_DAY {
+		length := MINUTES_IN_A_DAY
+		basey := base/MINUTES_IN_A_DAY*size*ROWS
+		if base + length > len(colorArray) {
+			length = len(colorArray)-base
+		}
+		for i := 0; i < length; i++ {
+			colorMatrix[i%ROWS][i/ROWS] = colorArray[base+i]
+		}
+		for i := 0; i < ROWS; i++ {
+			if l2r {
+				for j := 0; j < COLUMNS; j++ {
+					if colorMatrix[i][j] != nil {
+						draw.Draw(m,image.Rect(j*size,basey+i*size,(j+1)*size,basey+(i+1)*size),&image.Uniform{colorMatrix[i][j]},image.ZP,draw.Src)
+					}
+				}
+			} else {
+				for j := 0; j < COLUMNS; j++ {
+					if colorMatrix[i][COLUMNS-j-1] != nil {
+						draw.Draw(m,image.Rect(j*size,basey+i*size,(j+1)*size,basey+(i+1)*size),&image.Uniform{colorMatrix[i][COLUMNS-j-1]},image.ZP,draw.Src)
+					}
+				}
+			}
+		}
+		l2r = !l2r
+	}
+	writer,err := os.Create(imagename)
+	defer writer.Close()
+	if err != nil {
+		fatalError("Error opening image to write",err)
+	}
+	encoder := &png.Encoder{0}
+	err = encoder.Encode(writer,m)
+	if err != nil {
+		fatalError("Error encoding image into png",err)
 	}
 }

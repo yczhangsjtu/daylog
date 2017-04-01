@@ -23,6 +23,7 @@ const (
 	STAT_USAGE = "Usage: daylog [options] stat [help]|[startday [endday]]"
 	LIST_USAGE = "Usage: daylog [options] list [help]|[startday [endday]]"
 	PLOT_USAGE = "Usage: daylog [options] plot [help]|[startday [endday]]"
+	DRAW_USAGE = "Usage: daylog [options] draw [help]|[startday [endday]]"
 	CONFIG_FILE = "config"
 	SETTING_FILE = "settings"
 	START_FILE = "start"
@@ -315,6 +316,32 @@ func plot() {
 	printColorArray(colorArray)
 }
 
+func drawSchedule() {
+	if flag.NArg() == 2 && flag.Arg(1) == "help" {
+		plotUsage()
+	}
+	statLength := statDayFromConfiguration()
+	toDay := schedule.GetTodayString()
+	startDay,_ := schedule.DayAddString(toDay,-statLength)
+	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	dayRange := RangeDay(startDay,toDay)
+	totalMinutes := len(dayRange)*MINUTES_IN_A_DAY
+	colorArray := make([]color.Color,totalMinutes)
+	compilePatterns(settingGroups)
+	for d,day := range dayRange {
+		scheduleGroup := readScheduleGroupByDay(day)
+		for i := 0; i < scheduleGroup.Size(); i++ {
+			item,_ := scheduleGroup.Get(i)
+			content := item.ContentString()
+			group := getItemGroup(content,settingGroups)
+			if group != nil {
+				fillColor(colorArray[d*MINUTES_IN_A_DAY:],item,getColor(group.color))
+			}
+		}
+	}
+	drawColorArray(colorArray,5,"schedule.png")
+}
+
 /******************
  * Tool functions *
  ******************/
@@ -363,6 +390,11 @@ func listUsage() {
 
 func plotUsage() {
 	fmt.Println(PLOT_USAGE)
+	os.Exit(0)
+}
+
+func drawUsage() {
+	fmt.Println(DRAW_USAGE)
 	os.Exit(0)
 }
 
@@ -514,6 +546,8 @@ func main() {
 		stat()
 	} else if command == "plot" {
 		plot()
+	} else if command == "draw" {
+		drawSchedule()
 	} else {
 		usage()
 	}
