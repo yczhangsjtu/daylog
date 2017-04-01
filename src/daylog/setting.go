@@ -57,22 +57,22 @@ func (g *SettingGroup) compilePattern() {
 
 func (g *SettingGroup) printTime() {
 	if g.minute == 0 {
-		fmt.Printf("%12s:\n",g.name)
+		fmt.Printf("%12s:\n",g.label)
 	} else if g.minute < 60 {
-		fmt.Printf("%12s:             %2d minutes\n",g.name,g.minute)
+		fmt.Printf("%12s:             %2d minutes\n",g.label,g.minute)
 	} else {
-		fmt.Printf("%12s: %5d hours %2d minutes\n",g.name,g.minute/60,g.minute%60)
+		fmt.Printf("%12s: %5d hours %2d minutes\n",g.label,g.minute/60,g.minute%60)
 	}
 }
 
 func (g *SettingGroup) printTimePercent(total int) {
 	percent := fmt.Sprintf("%2.2f%%",float64(g.minute)/float64(total)*100)
 	if g.minute == 0 {
-		fmt.Printf("%12s:\n",g.name)
+		fmt.Printf("%12s:\n",g.label)
 	} else if g.minute < 60 {
-		fmt.Printf("%12s:             %2d minutes (%s)\n",g.name,g.minute,percent)
+		fmt.Printf("%12s:             %2d minutes (%s)\n",g.label,g.minute,percent)
 	} else {
-		fmt.Printf("%12s: %5d hours %2d minutes (%s)\n",g.name,g.minute/60,g.minute%60,percent)
+		fmt.Printf("%12s: %5d hours %2d minutes (%s)\n",g.label,g.minute/60,g.minute%60,percent)
 	}
 }
 

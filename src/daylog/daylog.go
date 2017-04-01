@@ -271,7 +271,9 @@ func stat() {
 	totalMinutes := 0
 	startCount := false
 	compilePatterns(settingGroups)
+	globalGroup := settingGroups["global"]
 	for _,day := range RangeDay(startDay,toDay) {
+		daysum := 0
 		scheduleGroup := readScheduleGroupByDay(day)
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
@@ -280,6 +282,7 @@ func stat() {
 			group := getItemGroup(content,settingGroups)
 			if group != nil {
 				group.minute += duration
+				daysum += duration
 			}
 		}
 		if !startCount && !scheduleGroup.Empty() {
@@ -288,17 +291,15 @@ func stat() {
 		}
 		if startCount {
 			totalMinutes += MINUTES_IN_A_DAY
+			globalGroup.minute += MINUTES_IN_A_DAY - daysum
 		}
 	}
-	sum := 0
 	fmt.Printf("Statistics from %s to %s:\n",startDay,toDay)
 	for _,group := range serializedSettingGroups(settingGroups) {
-		sum += group.minute
 		printColorSchemeHead(colorScheme,group.color)
 		group.printTimePercent(totalMinutes)
 		printColorSchemeTail(colorScheme,group.color)
 	}
-	fmt.Printf("%12s: %5d hours %2d minutes\n","Sum",sum/60,sum%60)
 	fmt.Printf("%12s: %5d hours %2d minutes\n","Total",totalMinutes/60,totalMinutes%60)
 }
 
