@@ -281,7 +281,7 @@ func stat() {
 	fmt.Printf("Statistics from %s to %s:\n",startDay,toDay)
 	for _,group := range serializedSettingGroups(settingGroups) {
 		sum += group.minute
-		group.printTime()
+		group.printTimePercent(totalMinutes)
 	}
 	fmt.Printf("%12s: %5d hours %2d minutes\n","Sum",sum/60,sum%60)
 	fmt.Printf("%12s: %5d hours %2d minutes\n","Total",totalMinutes/60,totalMinutes%60)
