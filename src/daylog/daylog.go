@@ -244,7 +244,8 @@ func list() {
 	compilePatterns(settingGroups)
 	for _,day := range RangeDay(startDay,toDay) {
 		scheduleGroup := readScheduleGroupByDay(day)
-		fmt.Printf("Day %s\n",day)
+		dayWithWeek,_ := schedule.GetDayWeekString(day)
+		fmt.Printf("Day %s\n",dayWithWeek)
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
 			group := getItemGroup(item.ContentString(),settingGroups)

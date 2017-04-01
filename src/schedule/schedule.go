@@ -14,6 +14,7 @@ const FORMAT string = "2006.01.02/15:04"
 const FORMAT_CLOCK string = "15:04"
 const FORMAT_DAY_CLOCK string = "01.02/15:04"
 const FORMAT_DAY string = "2006.01.02"
+const FORMAT_DAY_WEEK string = "2006.01.02 Mon"
 const FORMAT_ONLY_DAY string = "01.02"
 var itemPattern *regexp.Regexp
 
@@ -51,6 +52,22 @@ func GetDayString(s string) (string,bool) {
 	t,err := time.Parse(FORMAT,s)
 	if err == nil {
 		return t.Format(FORMAT_DAY),true
+	}
+	return "",false
+}
+
+func GetDayWeekString(s string) (string,bool) {
+	t,err := time.Parse(FORMAT,s)
+	if err == nil {
+		return t.Format(FORMAT_DAY_WEEK),true
+	}
+	t,err = time.Parse(FORMAT_ONLY_DAY,s)
+	if err == nil {
+		return t.Format(FORMAT_DAY_WEEK),true
+	}
+	t,err = time.Parse(FORMAT_DAY,s)
+	if err == nil {
+		return t.Format(FORMAT_DAY_WEEK),true
 	}
 	return "",false
 }
