@@ -418,6 +418,7 @@ func readSetting() {
 		label := parseGroupLabel(line)
 		if label != "" {
 			tryAddingNewGroup(settingGroups,label)
+			currentGroup = label
 			continue
 		}
 		log.Fatalf("Invalid setting in '%s:%d'",SETTING_FILE,i+1)
