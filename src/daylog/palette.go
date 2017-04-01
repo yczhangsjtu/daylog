@@ -156,4 +156,20 @@ var colorMap = map[string] color.Color {
 }
 
 var bashColorMap = map[string]string {
+	"white":"1;37",
+	"black":"0;30",
+	"blue":"0;34",
+	"lightBlue":"1;34",
+	"green":"0;32",
+	"lightGreen":"1;32",
+	"cyan":"0;36",
+	"lightCyan":"1;36",
+	"red":"0;31",
+	"lightRed":"1;31",
+	"purple":"0;35",
+	"lightPurple":"1;35",
+	"brown":"0;33",
+	"yellow":"1;33",
+	"gray":"0;30",
+	"lightGray":"0;37",
 }

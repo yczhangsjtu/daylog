@@ -202,6 +202,32 @@ func WriteFile(filename,data string) {
 	fatalErrorf(err,"Error writing: %s",filename)
 }
 
+func printColorSchemeHead(colorScheme,c string) {
+	if colorScheme == "bash" {
+		printBashColorHead(c)
+	}
+}
+
+func printColorSchemeTail(colorScheme,c string) {
+	if colorScheme == "bash" {
+		printBashColorTail(c)
+	}
+}
+
+func printBashColorHead(c string) {
+	head,ok := bashColorMap[c]
+	if ok {
+		fmt.Printf("\033[%sm",head)
+	}
+}
+
+func printBashColorTail(c string) {
+	_,ok := bashColorMap[c]
+	if ok {
+		fmt.Printf("\033[0m")
+	}
+}
+
 func getColor(name string) color.Color {
 	c,ok := colorMap[name]
 	fatalFalsef(ok,"Unrecognized color: %s",name)

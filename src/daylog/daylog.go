@@ -36,6 +36,7 @@ const (
 
 var verboseLevel int
 var verbose bool
+var colorScheme string
 var path string
 var startPath string
 var ok bool
@@ -240,12 +241,20 @@ func list() {
 	startDay := "yesterday"
 	toDay := "today"
 	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	compilePatterns(settingGroups)
 	for _,day := range RangeDay(startDay,toDay) {
 		scheduleGroup := readScheduleGroupByDay(day)
 		fmt.Printf("Day %s\n",day)
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
+			group := getItemGroup(item.ContentString(),settingGroups)
+			if group != nil {
+				printColorSchemeHead(colorScheme,group.color)
+			}
 			item.Print()
+			if group != nil {
+				printColorSchemeTail(colorScheme,group.color)
+			}
 		}
 	}
 }
@@ -284,7 +293,9 @@ func stat() {
 	fmt.Printf("Statistics from %s to %s:\n",startDay,toDay)
 	for _,group := range serializedSettingGroups(settingGroups) {
 		sum += group.minute
+		printColorSchemeHead(colorScheme,group.color)
 		group.printTimePercent(totalMinutes)
+		printColorSchemeTail(colorScheme,group.color)
 	}
 	fmt.Printf("%12s: %5d hours %2d minutes\n","Sum",sum/60,sum%60)
 	fmt.Printf("%12s: %5d hours %2d minutes\n","Total",totalMinutes/60,totalMinutes%60)
@@ -340,6 +351,7 @@ func drawSchedule() {
 		}
 	}
 	drawColorArray(colorArray,5,"schedule.png")
+	fmt.Printf("%s saved to current directory.\n","schedule.png")
 }
 
 /******************
@@ -502,6 +514,7 @@ func saveSetting() {
 func parseGlobalOptions() {
 	flag.IntVar(&verboseLevel,"verbose",0,"Verbose level")
 	flag.BoolVar(&verbose,"v",false,"Verbose")
+	flag.StringVar(&colorScheme,"c","none","Color scheme")
 
 	flag.Parse()
 
