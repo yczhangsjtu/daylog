@@ -17,6 +17,7 @@ const (
 	SETTING_USAGE = "Usage: daylog [options] set {help | key | key=value}"
 	START_USAGE = "Usage: daylog [options] start [help]|[content [time]]"
 	RESTART_USAGE = "Usage: daylog [options] restart [help]|[content]|[time]"
+	CANCEL_USAGE = "Usage: daylog [options] cancel [help]"
 	FINISH_USAGE = "Usage: daylog [options] finish [help]|[time]"
 	STAT_USAGE = "Usage: daylog [options] stat [help]|[starttime [endtime]]"
 	LIST_USAGE = "Usage: daylog [options] list [help]|[starttime [endtime]]"
@@ -143,6 +144,25 @@ func restart() {
 	fmt.Printf("Restarted: %s\n",item.ContentString())
 	fmt.Printf("Time: %s\n",item.StartString())
 	WriteFile(startPath,item.String())
+}
+
+func cancel() {
+	if flag.NArg() > 1 {
+		cancelUsage()
+	}
+	startFile,err := ioutil.ReadFile(startPath)
+	fatalNotFileNotExistError(err)
+	fatalFalse(err==nil,"No schedule started yet!")
+	startString := strings.Trim(string(startFile),"\n")
+	item,err := schedule.ScheduleItemFromString(startString)
+	fatalError("Failed to parse schedule item",err)
+	fmt.Printf("Going to cancel task: %s\n",item.ContentString())
+	fmt.Printf("At Time: %s\n",item.StartString())
+	fmt.Printf("Proceed? (Y/n)")
+	ProceedOrExit(true)
+	err = os.Remove(startPath)
+	fatalError("Error removing starting file",err)
+	fmt.Printf("Schedule canceled.\n")
 }
 
 func finish() {
@@ -290,6 +310,11 @@ func startUsage() {
 
 func restartUsage() {
 	fmt.Println(RESTART_USAGE)
+	os.Exit(0)
+}
+
+func cancelUsage() {
+	fmt.Println(CANCEL_USAGE)
 	os.Exit(0)
 }
 
@@ -445,6 +470,8 @@ func main() {
 		start()
 	} else if command == "restart" {
 		restart()
+	} else if command == "cancel" {
+		cancel()
 	} else if command == "finish" {
 		finish()
 	} else if command == "list" {
