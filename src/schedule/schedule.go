@@ -114,12 +114,7 @@ func DayNotAfterString(start,to string) bool {
 }
 
 func TomorrowString(s string) (string,error) {
-	day,err := time.Parse(FORMAT_DAY,s)
-	if err != nil {
-		return s,err
-	}
-	day = day.AddDate(0,0,1)
-	return day.Format(FORMAT_DAY),nil
+	return DayAddString(s,1)
 }
 
 func DayAddString(s string,d int) (string,error) {
@@ -152,6 +147,19 @@ func GetNow() *time.Time {
 	return &now
 }
 
+func GetRange(s,t string) (from,to *time.Time, err error) {
+	ff,err := time.Parse(FORMAT_DAY,s)
+	if err != nil {
+		return nil,nil,err
+	}
+	tt,err := time.Parse(FORMAT_DAY,t)
+	if err != nil {
+		return nil,nil,err
+	}
+	tt = tt.AddDate(0,0,1)
+	return &ff,&tt,nil
+}
+
 /****************
  * ScheduleItem *
  ****************/
@@ -161,7 +169,6 @@ type ScheduleItem struct {
 	finish *time.Time
 	content string
 }
-
 
 func NewScheduleItem() (item *ScheduleItem) {
 	item = &ScheduleItem{nil,nil,""}
@@ -314,12 +321,50 @@ func (item *ScheduleItem) ContentString() string {
 
 func (item *ScheduleItem) Duration() (int,error) {
 	if item.start == nil {
-		return 0,errors.New("Empty start time")
+		return -1,errors.New("Empty start time")
 	}
 	if item.finish == nil {
-		return 0,errors.New("Empty finish time")
+		return -1,errors.New("Empty finish time")
 	}
 	minute := int(item.finish.Sub(*item.start).Minutes())
+	return minute,nil
+}
+
+func (item *ScheduleItem) DurationInDay(s string) (int,error) {
+	return item.DurationInDayRange(s,s)
+}
+
+func (item *ScheduleItem) DurationInDayRange(s,t string) (int,error) {
+	if item.start == nil {
+		return -1,errors.New("Empty start time")
+	}
+	if item.finish == nil {
+		return -1,errors.New("Empty finish time")
+	}
+	from,to,err := GetRange(s,t)
+	if err != nil {
+		return -1,err
+	}
+	return item.DurationWithin(from,to)
+}
+
+func (item *ScheduleItem) DurationWithin(from *time.Time, to *time.Time) (int,error) {
+	if from.After(*to) {
+		return -1,errors.New("Invalid range of time: " + from.Format(FORMAT) + " " + to.Format(FORMAT))
+	}
+	if item.start.After(*to) {
+		return 0,nil
+	}
+	if item.finish.Before(*from) {
+		return 0,nil
+	}
+	if item.start.After(*from) {
+		from = item.start
+	}
+	if item.finish.Before(*to) {
+		to = item.finish
+	}
+	minute := int(to.Sub(*from).Minutes())
 	return minute,nil
 }
 

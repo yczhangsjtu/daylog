@@ -268,32 +268,34 @@ func stat() {
 	toDay := schedule.GetTodayString()
 	startDay,_ := schedule.DayAddString(toDay,-statLength)
 	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	oneDayBefore,_ := schedule.DayAddString(startDay,-1)
 	totalMinutes := 0
 	startCount := false
 	compilePatterns(settingGroups)
 	globalGroup := settingGroups["global"]
-	for _,day := range RangeDay(startDay,toDay) {
-		daysum := 0
+	from,to,_ := schedule.GetRange(startDay,toDay)
+	sum := 0
+	for _,day := range RangeDay(oneDayBefore,toDay) {
 		scheduleGroup := readScheduleGroupByDay(day)
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
-			duration,_ := item.Duration()
+			duration,_ := item.DurationWithin(from,to)
 			content := item.ContentString()
 			group := getItemGroup(content,settingGroups)
 			if group != nil {
 				group.minute += duration
-				daysum += duration
+				sum += duration
 			}
 		}
-		if !startCount && !scheduleGroup.Empty() {
+		if !startCount && !scheduleGroup.Empty() && day != oneDayBefore {
 			startCount = true
 			startDay = day
 		}
 		if startCount {
 			totalMinutes += MINUTES_IN_A_DAY
-			globalGroup.minute += MINUTES_IN_A_DAY - daysum
 		}
 	}
+	globalGroup.minute = totalMinutes - sum
 	fmt.Printf("Statistics from %s to %s:\n",startDay,toDay)
 	for _,group := range serializedSettingGroups(settingGroups) {
 		printColorSchemeHead(colorScheme,group.color)
