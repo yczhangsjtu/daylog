@@ -108,6 +108,24 @@ func CompareDayString(start,to string) int {
 	}
 }
 
+func CompareTimeString(start,to string) int {
+	startTime,err := time.Parse(FORMAT,start)
+	if err != nil {
+		return -2
+	}
+	toTime,err := time.Parse(FORMAT_DAY,to)
+	if err != nil {
+		return -2
+	}
+	if startTime.Before(toTime) {
+		return -1
+	} else if startTime.After(toTime) {
+		return 1
+	} else {
+		return 0
+	}
+}
+
 func DayNotAfterString(start,to string) bool {
 	cmp := CompareDayString(start,to)
 	return cmp == -1 || cmp == 0
@@ -158,6 +176,14 @@ func GetRange(s,t string) (from,to *time.Time, err error) {
 	}
 	tt = tt.AddDate(0,0,1)
 	return &ff,&tt,nil
+}
+
+func GetTime(s string) (*time.Time,error) {
+	t,err := time.Parse(FORMAT,s)
+	if err != nil {
+		return nil,err
+	}
+	return &t,nil
 }
 
 /****************

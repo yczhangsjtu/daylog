@@ -24,6 +24,7 @@ const (
 	LIST_USAGE = "Usage: daylog [options] list [help]|[startday [endday]]"
 	PLOT_USAGE = "Usage: daylog [options] plot [help]|[startday [endday]]"
 	DRAW_USAGE = "Usage: daylog [options] draw [help]|[startday [endday]]"
+	JOB_USAGE = "Usage: daylog [options] job [help]|[startday [endday]]"
 	CONFIG_FILE = "config"
 	SETTING_FILE = "settings"
 	START_FILE = "start"
@@ -358,6 +359,43 @@ func drawSchedule() {
 	fmt.Printf("%s saved to current directory.\n","schedule.png")
 }
 
+func job() {
+	if flag.NArg() == 2 && flag.Arg(1) == "help" {
+		jobUsage()
+	}
+	statLength := statDayFromConfiguration()
+	toDay := schedule.GetTodayString()
+	startDay,_ := schedule.DayAddString(toDay,-statLength)
+	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	compilePatterns(settingGroups)
+	dayRange := RangeDay(startDay,toDay)
+	globalGroup := settingGroups["global"]
+	for _,day := range dayRange {
+		scheduleGroup := readScheduleGroupByDay(day)
+		for i := 0; i < scheduleGroup.Size(); i++ {
+			item,_ := scheduleGroup.Get(i)
+			content := item.ContentString()
+			group := getItemGroup(content,settingGroups)
+			if group == nil {
+				group = globalGroup
+			}
+			group.Update(item)
+		}
+	}
+	fmt.Printf("From %s to %s:\n",startDay,toDay)
+	for _,group := range serializedSettingGroups(settingGroups) {
+		printColorSchemeHead(colorScheme,group.color)
+		fmt.Printf("[%s]\n",group.label)
+		printColorSchemeTail(colorScheme,group.color)
+		jobs := group.GetJobs()
+		for _,job := range jobs {
+			printColorSchemeHead(colorScheme,group.color)
+			job.Print()
+			printColorSchemeTail(colorScheme,group.color)
+		}
+	}
+}
+
 /******************
  * Tool functions *
  ******************/
@@ -411,6 +449,11 @@ func plotUsage() {
 
 func drawUsage() {
 	fmt.Println(DRAW_USAGE)
+	os.Exit(0)
+}
+
+func jobUsage() {
+	fmt.Println(JOB_USAGE)
 	os.Exit(0)
 }
 
@@ -565,6 +608,8 @@ func main() {
 		plot()
 	} else if command == "draw" {
 		drawSchedule()
+	} else if command == "job" {
+		job()
 	} else {
 		usage()
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"regexp"
+	"schedule"
 )
 
 type SettingGroup struct {
@@ -14,10 +15,12 @@ type SettingGroup struct {
 	pattern string
 	minute int
 	compiled *regexp.Regexp
+	jobset *JobSet
 }
 
 func NewSettingGroup(name string) (g *SettingGroup) {
-	g = &SettingGroup{name,name,"","",0,nil}
+	g = &SettingGroup{name,name,"","",0,nil,nil}
+	g.jobset = NewJobSet()
 	return
 }
 
@@ -74,6 +77,14 @@ func (g *SettingGroup) printTimePercent(total int) {
 	} else {
 		fmt.Printf("%12s: %5d hours %2d minutes (%s)\n",g.label,g.minute/60,g.minute%60,percent)
 	}
+}
+
+func (g *SettingGroup) Update(item *schedule.ScheduleItem) {
+	g.jobset.Update(item)
+}
+
+func (g *SettingGroup) GetJobs() []*Job {
+	return g.jobset.GetJobs()
 }
 
 func serializedSettingGroups(settingGroups map[string]*SettingGroup) (groups []*SettingGroup) {
