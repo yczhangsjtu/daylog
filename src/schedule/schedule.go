@@ -258,7 +258,6 @@ func (item *ScheduleItem) SetFinish(finish *time.Time) bool {
 		item.finish = finish
 		return true
 	}
-	fmt.Printf("item.start = %s, item.finish = %s\n",item.start.String(),finish.String())
 	return false
 }
 
