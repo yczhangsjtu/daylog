@@ -1,0 +1,94 @@
+package main
+
+import (
+	"os"
+	"log"
+	"flag"
+	"path/filepath"
+)
+
+func setPath() {
+	path,ok = os.LookupEnv("DAYLOG_PATH")
+	if !ok {
+		path = EvalPath(DEFAULT_PATH)
+	}
+	Verbose(1,"Base path set to: %s\n",path)
+	startPath = filepath.Join(path,START_FILE)
+}
+
+func readConfig() {
+	configuration = make(map[string]string)
+
+	configPath := filepath.Join(path,CONFIG_FILE)
+	Verbose(1,"Reading configuration file: %s\n",configPath)
+	configs,ok := SplitFileByLine(configPath)
+	if !ok {
+		return
+	}
+	for i,c := range configs {
+		line := parseComment(c)
+		if line == "" {
+			continue
+		}
+		key,value := parseKeyValue(line)
+		fatalTruef(key=="","Invalid configuration in %s: %d",CONFIG_FILE,i+1)
+		configuration[key] = value
+	}
+}
+
+func readSetting() {
+	settingGroups = make(map[string]*SettingGroup)
+	currentGroup := "global"
+	settingGroups[currentGroup] = NewSettingGroup(currentGroup)
+
+	settingPath := filepath.Join(path,SETTING_FILE)
+	Verbose(1,"Reading setting file: %s\n",settingPath)
+	settings,ok := SplitFileByLine(settingPath)
+	if !ok {
+		return
+	}
+	for i,c := range settings {
+		line := parseComment(c)
+		if line == "" {
+			continue
+		}
+		key,value := parseSpecialKeyValue(line)
+		if key != "" {
+			Verbose(2,"%s[%s] = [%s]\n",currentGroup,key,value)
+			settingGroups[currentGroup].set(key,value)
+			continue
+		}
+		label := parseGroupLabel(line)
+		if label != "" {
+			tryAddingNewGroup(settingGroups,label)
+			currentGroup = label
+			continue
+		}
+		log.Fatalf("Invalid setting in '%s:%d'",SETTING_FILE,i+1)
+	}
+}
+
+func saveSetting() {
+	settingPath := filepath.Join(path,SETTING_FILE)
+	settings := ""
+	for _,group := range serializedSettingGroups(settingGroups) {
+		settings += group.String()
+	}
+	WriteFile(settingPath,settings)
+}
+
+func parseGlobalOptions() {
+	flag.IntVar(&verboseLevel,"verbose",0,"Verbose level")
+	flag.BoolVar(&verbose,"v",false,"Verbose")
+	flag.StringVar(&colorScheme,"c","none","Color scheme")
+
+	flag.Parse()
+
+	if verboseLevel > 0 {
+		verbose = true
+	}
+	if verbose && verboseLevel == 0{
+		verboseLevel = 1
+	}
+}
+

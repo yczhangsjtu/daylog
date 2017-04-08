@@ -14,17 +14,6 @@ import (
 
 const (
 	DEFAULT_PATH string = "~/.daylog"
-	USAGE = "Usage: daylog [options] command [args]"
-	SETTING_USAGE = "Usage: daylog [options] set {help | key | key=value}"
-	START_USAGE = "Usage: daylog [options] start [help]|[content [time]]"
-	RESTART_USAGE = "Usage: daylog [options] restart [help]|[content]|[time]"
-	CANCEL_USAGE = "Usage: daylog [options] cancel [help]"
-	FINISH_USAGE = "Usage: daylog [options] finish [help]|[time]"
-	STAT_USAGE = "Usage: daylog [options] stat [help]|[startday [endday]]"
-	LIST_USAGE = "Usage: daylog [options] list [help]|[startday [endday]]"
-	PLOT_USAGE = "Usage: daylog [options] plot [help]|[startday [endday]]"
-	DRAW_USAGE = "Usage: daylog [options] draw [help]|[startday [endday]]"
-	JOB_USAGE = "Usage: daylog [options] job [help]|[startday [endday]]"
 	CONFIG_FILE = "config"
 	SETTING_FILE = "settings"
 	START_FILE = "start"
@@ -43,7 +32,6 @@ var startPath string
 var ok bool
 
 var configuration map[string]string
-
 var settingGroups map[string]*SettingGroup
 
 /**************
@@ -396,180 +384,36 @@ func job() {
 	}
 }
 
-/******************
- * Tool functions *
- ******************/
-
-func usage() {
-	fmt.Println(USAGE)
-	fmt.Println("options:")
-	flag.PrintDefaults()
-	os.Exit(0)
-}
-
-func setUsage() {
-	fmt.Println(SETTING_USAGE)
-	os.Exit(0)
-}
-
-func startUsage() {
-	fmt.Println(START_USAGE)
-	os.Exit(0)
-}
-
-func restartUsage() {
-	fmt.Println(RESTART_USAGE)
-	os.Exit(0)
-}
-
-func cancelUsage() {
-	fmt.Println(CANCEL_USAGE)
-	os.Exit(0)
-}
-
-func finishUsage() {
-	fmt.Println(FINISH_USAGE)
-	os.Exit(0)
-}
-
-func statUsage() {
-	fmt.Println(STAT_USAGE)
-	os.Exit(0)
-}
-
-func listUsage() {
-	fmt.Println(LIST_USAGE)
-	os.Exit(0)
-}
-
-func plotUsage() {
-	fmt.Println(PLOT_USAGE)
-	os.Exit(0)
-}
-
-func drawUsage() {
-	fmt.Println(DRAW_USAGE)
-	os.Exit(0)
-}
-
-func jobUsage() {
-	fmt.Println(JOB_USAGE)
-	os.Exit(0)
-}
-
-func statDayFromConfiguration() int {
-	var statLength int
-	statLengthS,ok := configuration["stat_day"]
-	_,err := fmt.Sscan(statLengthS,"%d",&statLength)
-	if !ok || err != nil || statLength < 0 {
-		return DEFAULT_STAT_DAY
+func jobstat() {
+	if flag.NArg() == 2 && flag.Arg(1) == "help" {
+		jobstatUsage()
 	}
-	return statLength
-}
-
-func evalDayPairByCommand(startDay,toDay string) (start,to string) {
-	if flag.NArg() > 1 {
-		startDay = flag.Arg(1)
-		toDay = startDay
-	}
-	if flag.NArg() > 2 {
-		toDay = flag.Arg(2)
-	}
-	var ok1,ok2 bool
-	start,ok1 = evalDay(startDay)
-	to,ok2 = evalDay(toDay)
-	fatalFalsef(ok1,"Invalid start day: %s",startDay)
-	fatalFalsef(ok2,"Invalid end day: %s",toDay)
-	fatalFalse(schedule.DayNotAfterString(start,to),"Start day is later than end day!")
-	return
-}
-
-/**************************
- * Handle global settings *
- **************************/
-
-func setPath() {
-	path,ok = os.LookupEnv("DAYLOG_PATH")
-	if !ok {
-		path = EvalPath(DEFAULT_PATH)
-	}
-	Verbose(1,"Base path set to: %s\n",path)
-	startPath = filepath.Join(path,START_FILE)
-}
-
-func readConfig() {
-	configuration = make(map[string]string)
-
-	configPath := filepath.Join(path,CONFIG_FILE)
-	Verbose(1,"Reading configuration file: %s\n",configPath)
-	configs,ok := SplitFileByLine(configPath)
-	if !ok {
-		return
-	}
-	for i,c := range configs {
-		line := parseComment(c)
-		if line == "" {
-			continue
+	statLength := statDayFromConfiguration()
+	toDay := schedule.GetTodayString()
+	startDay,_ := schedule.DayAddString(toDay,-statLength)
+	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	compilePatterns(settingGroups)
+	dayRange := RangeDay(startDay,toDay)
+	jobset := NewJobSet()
+	for _,day := range dayRange {
+		scheduleGroup := readScheduleGroupByDay(day)
+		for i := 0; i < scheduleGroup.Size(); i++ {
+			item,_ := scheduleGroup.Get(i)
+			jobset.Update(item)
 		}
-		key,value := parseKeyValue(line)
-		fatalTruef(key=="","Invalid configuration in %s: %d",CONFIG_FILE,i+1)
-		configuration[key] = value
 	}
-}
-
-func readSetting() {
-	settingGroups = make(map[string]*SettingGroup)
-	currentGroup := "global"
-	settingGroups[currentGroup] = NewSettingGroup(currentGroup)
-
-	settingPath := filepath.Join(path,SETTING_FILE)
-	Verbose(1,"Reading setting file: %s\n",settingPath)
-	settings,ok := SplitFileByLine(settingPath)
-	if !ok {
-		return
-	}
-	for i,c := range settings {
-		line := parseComment(c)
-		if line == "" {
-			continue
+	fmt.Printf("From %s to %s:\n",startDay,toDay)
+	jobs := jobset.GetJobsByTime()
+	globalGroup := settingGroups["global"]
+	for _,job := range jobs {
+		group := getItemGroup(job.Content(),settingGroups)
+		if group == nil {
+			group = globalGroup
 		}
-		key,value := parseSpecialKeyValue(line)
-		if key != "" {
-			Verbose(2,"%s[%s] = [%s]\n",currentGroup,key,value)
-			settingGroups[currentGroup].set(key,value)
-			continue
-		}
-		label := parseGroupLabel(line)
-		if label != "" {
-			tryAddingNewGroup(settingGroups,label)
-			currentGroup = label
-			continue
-		}
-		log.Fatalf("Invalid setting in '%s:%d'",SETTING_FILE,i+1)
-	}
-}
-
-func saveSetting() {
-	settingPath := filepath.Join(path,SETTING_FILE)
-	settings := ""
-	for _,group := range serializedSettingGroups(settingGroups) {
-		settings += group.String()
-	}
-	WriteFile(settingPath,settings)
-}
-
-func parseGlobalOptions() {
-	flag.IntVar(&verboseLevel,"verbose",0,"Verbose level")
-	flag.BoolVar(&verbose,"v",false,"Verbose")
-	flag.StringVar(&colorScheme,"c","none","Color scheme")
-
-	flag.Parse()
-
-	if verboseLevel > 0 {
-		verbose = true
-	}
-	if verbose && verboseLevel == 0{
-		verboseLevel = 1
+		printColorSchemeHead(colorScheme,group.color)
+		fmt.Printf("%12s ",group.label)
+		job.Print()
+		printColorSchemeTail(colorScheme,group.color)
 	}
 }
 
@@ -610,6 +454,8 @@ func main() {
 		drawSchedule()
 	} else if command == "job" {
 		job()
+	} else if command == "jobstat" {
+		jobstat()
 	} else {
 		usage()
 	}

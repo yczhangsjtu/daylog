@@ -48,6 +48,10 @@ func (job *Job) GetGroup() string {
 	return job.group
 }
 
+func (job *Job) Content() string {
+	return job.content
+}
+
 func (job *Job) Since() int {
 	now := schedule.GetNow()
 	last,err := schedule.GetTime(job.last)
@@ -107,6 +111,19 @@ func (jobset *JobSet) GetJobs() []*Job {
 	}
 	sort.SliceStable(jobs,func (i,j int) bool {
 		return jobs[i].content < jobs[j].content
+	})
+	return jobs
+}
+
+func (jobset *JobSet) GetJobsByTime() []*Job {
+	jobs := make([]*Job,len(*jobset.jobs))
+	i := 0
+	for _,job := range *jobset.jobs {
+		jobs[i] = job
+		i += 1
+	}
+	sort.SliceStable(jobs,func (i,j int) bool {
+		return schedule.CompareTimeString(jobs[i].last,jobs[j].last) == 1
 	})
 	return jobs
 }

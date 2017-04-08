@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"fmt"
+	"flag"
 	"os/user"
 	"path/filepath"
 	"schedule"
@@ -339,4 +340,31 @@ func drawColorArray(colorArray []color.Color,size int,imagename string) {
 	if err != nil {
 		fatalError("Error encoding image into png",err)
 	}
+}
+
+func statDayFromConfiguration() int {
+	var statLength int
+	statLengthS,ok := configuration["stat_day"]
+	_,err := fmt.Sscan(statLengthS,"%d",&statLength)
+	if !ok || err != nil || statLength < 0 {
+		return DEFAULT_STAT_DAY
+	}
+	return statLength
+}
+
+func evalDayPairByCommand(startDay,toDay string) (start,to string) {
+	if flag.NArg() > 1 {
+		startDay = flag.Arg(1)
+		toDay = startDay
+	}
+	if flag.NArg() > 2 {
+		toDay = flag.Arg(2)
+	}
+	var ok1,ok2 bool
+	start,ok1 = evalDay(startDay)
+	to,ok2 = evalDay(toDay)
+	fatalFalsef(ok1,"Invalid start day: %s",startDay)
+	fatalFalsef(ok2,"Invalid end day: %s",toDay)
+	fatalFalse(schedule.DayNotAfterString(start,to),"Start day is later than end day!")
+	return
 }

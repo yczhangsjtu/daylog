@@ -113,7 +113,7 @@ func CompareTimeString(start,to string) int {
 	if err != nil {
 		return -2
 	}
-	toTime,err := time.Parse(FORMAT_DAY,to)
+	toTime,err := time.Parse(FORMAT,to)
 	if err != nil {
 		return -2
 	}
