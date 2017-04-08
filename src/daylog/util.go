@@ -368,3 +368,11 @@ func evalDayPairByCommand(startDay,toDay string) (start,to string) {
 	fatalFalse(schedule.DayNotAfterString(start,to),"Start day is later than end day!")
 	return
 }
+
+func getDayPairFromCommand() (start,to string) {
+	statLength := statDayFromConfiguration()
+	toDay := schedule.GetTodayString()
+	startDay,_ := schedule.DayAddString(toDay,-statLength)
+	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	return startDay,toDay
+}

@@ -25,6 +25,18 @@ func usage() {
 	fmt.Println(USAGE)
 	fmt.Println("options:")
 	flag.PrintDefaults()
+	fmt.Println("command:")
+	fmt.Println("  set     update setting of particular job group")
+	fmt.Println("  start   start a job")
+	fmt.Println("  restart restart the job")
+	fmt.Println("  cancel  cancel the started job")
+	fmt.Println("  finish  finish the current job or prolong the last finished job")
+	fmt.Println("  list    list jobs")
+	fmt.Println("  stat    show statistic")
+	fmt.Println("  plot    plot time usage")
+	fmt.Println("  draw    draw time usage")
+	fmt.Println("  job     show jobs present")
+	fmt.Println("  jobstat sort jobs by last time")
 	os.Exit(0)
 }
 
@@ -82,5 +94,3 @@ func jobstatUsage() {
 	fmt.Println(JOBSTAT_USAGE)
 	os.Exit(0)
 }
-
-

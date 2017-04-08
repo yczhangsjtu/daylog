@@ -4,7 +4,6 @@ import (
 	"os"
 	"flag"
 	"fmt"
-	"log"
 	"strings"
 	"schedule"
 	"path/filepath"
@@ -31,15 +30,10 @@ func set() {
 	fatalTrue(name == "" || key == "","Invalid group.key/value pair!")
 	if value == "" {
 		settingGroup,ok := settingGroups[name]
-		if !ok {
-			log.Fatalf("Group not exist: %s",name)
-		}
+		fatalFalsef(ok,"Group not exist: %s",name)
 		value,ok = settingGroup.get(key)
-		if ok {
-			fmt.Printf("%s.%s: %s\n",name,key,value)
-		} else {
-			fmt.Printf("Invalid key: %s\n",key)
-		}
+		fatalFalsef(ok,"Invalid key: %s\n",key)
+		fmt.Printf("%s.%s: %s\n",name,key,value)
 	} else {
 		settingGroup,ok := settingGroups[name]
 		if !ok {
@@ -57,8 +51,7 @@ func start() {
 	if flag.NArg() == 2 && flag.Arg(1) == "help" {
 		startUsage()
 	}
-	content := ""
-	startTime := schedule.GetNowString()
+	content,startTime := "",schedule.GetNowString()
 	if flag.NArg() > 1 {
 		content = flag.Arg(1)
 	}
@@ -88,8 +81,7 @@ func restart() {
 	if flag.NArg() > 2 || (flag.NArg() == 2 && flag.Arg(1) == "help") {
 		restartUsage()
 	}
-	content := ""
-	startTime := ""
+	content,startTime := "",schedule.GetNowString()
 	if flag.NArg() > 1 {
 		possibleTime,istime := schedule.GetFullTime(flag.Arg(1))
 		if istime {
@@ -97,8 +89,6 @@ func restart() {
 		} else {
 			content = flag.Arg(1)
 		}
-	} else {
-		startTime = schedule.GetNowString()
 	}
 	startFile,err := ioutil.ReadFile(startPath)
 	fatalNotFileNotExistError(err)
@@ -119,8 +109,7 @@ func restart() {
 		ProceedOrExit(true)
 		item.SetContent(content)
 	}
-	fmt.Printf("Restarted: %s\n",item.ContentString())
-	fmt.Printf("Time: %s\n",item.StartString())
+	fmt.Printf("Restarted: %s\nTime: %s\n",item.ContentString(),item.StartString())
 	WriteFile(startPath,item.String())
 }
 
@@ -135,8 +124,7 @@ func cancel() {
 	item,err := schedule.ScheduleItemFromString(startString)
 	fatalError("Failed to parse schedule item",err)
 	fmt.Printf("Going to cancel task: %s\n",item.ContentString())
-	fmt.Printf("At Time: %s\n",item.StartString())
-	fmt.Printf("Proceed? (Y/n)")
+	fmt.Printf("At Time: %s\nProceed? (Y/n)",item.StartString())
 	ProceedOrExit(true)
 	err = os.Remove(startPath)
 	fatalError("Error removing starting file",err)
@@ -161,8 +149,7 @@ func finish() {
 	item,err := schedule.ScheduleItemFromString(startString)
 	fatalError("Start file corrupted: "+startPath,err)
 	fmt.Printf("Going to finish task: %s\n",item.ContentString())
-	fmt.Printf("Started at time: %s\n",item.StartString())
-	fmt.Printf("Proceed? (Y/n)")
+	fmt.Printf("Started at time: %s\nProceed? (Y/n)",item.StartString())
 	ProceedOrExit(true)
 	fmt.Printf("Going to finish at %s\n",finishTime)
 	ok := item.SetFinishString(finishTime)
@@ -192,12 +179,9 @@ func prolongFinish(newtime string) {
 	fatalTruef(scheduleGroup.Empty(),"Empty schedule file: %s",schedulePath)
 	item,_ := scheduleGroup.GetLast()
 	newtime = ExpandPossibleEmptyToNow(newtime)
-	fmt.Printf("No started schedule! Have to prolong the last item.\n")
-	fmt.Printf("Last: %s\n",item.ContentString())
-	fmt.Printf("Started at: %s\n",item.StartString())
-	fmt.Printf("Finished at: %s\n",item.FinishString())
-	fmt.Printf("Going to update to: %s\n",newtime)
-	fmt.Printf("Proceed to prolong? (Y/n)")
+	fmt.Printf("No started schedule! Have to prolong the last item.\nLast: %s\n",item.ContentString())
+	fmt.Printf("Started at: %s\nFinished at: %s\n",item.StartString(),item.FinishString())
+	fmt.Printf("Going to update to: %s\nProceed? (Y/n)",newtime)
 	ProceedOrExit(true)
 	ok := item.SetFinishString(newtime)
 	fatalFalsef(ok,"Invalid new finish time: %s",newtime)
@@ -212,9 +196,7 @@ func list() {
 	if flag.NArg() == 2 && flag.Arg(1) == "help" {
 		listUsage()
 	}
-	startDay := "yesterday"
-	toDay := "today"
-	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	startDay,toDay := evalDayPairByCommand("yesterday","today")
 	compilePatterns(settingGroups)
 	for _,day := range RangeDay(startDay,toDay) {
 		scheduleGroup := readScheduleGroupByDay(day)
@@ -238,24 +220,18 @@ func stat() {
 	if flag.NArg() == 2 && flag.Arg(1) == "help" {
 		statUsage()
 	}
-	statLength := statDayFromConfiguration()
-	toDay := schedule.GetTodayString()
-	startDay,_ := schedule.DayAddString(toDay,-statLength)
-	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	startDay,toDay := getDayPairFromCommand()
 	oneDayBefore,_ := schedule.DayAddString(startDay,-1)
-	totalMinutes := 0
-	startCount := false
+	totalMinutes,sum,startCount := 0,0,false
 	compilePatterns(settingGroups)
 	globalGroup := settingGroups["global"]
 	from,to,_ := schedule.GetRange(startDay,toDay)
-	sum := 0
 	for _,day := range RangeDay(oneDayBefore,toDay) {
 		scheduleGroup := readScheduleGroupByDay(day)
 		for i := 0; i < scheduleGroup.Size(); i++ {
 			item,_ := scheduleGroup.Get(i)
 			duration,_ := item.DurationWithin(from,to)
-			content := item.ContentString()
-			group := getItemGroup(content,settingGroups)
+			group := getItemGroup(item.ContentString(),settingGroups)
 			if group != nil {
 				group.minute += duration
 				sum += duration
@@ -283,10 +259,7 @@ func plot() {
 	if flag.NArg() == 2 && flag.Arg(1) == "help" {
 		plotUsage()
 	}
-	statLength := statDayFromConfiguration()
-	toDay := schedule.GetTodayString()
-	startDay,_ := schedule.DayAddString(toDay,-statLength)
-	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	startDay,toDay := getDayPairFromCommand()
 	dayRange := RangeDay(startDay,toDay)
 	totalMinutes := len(dayRange)*MINUTES_IN_A_DAY
 	colorArray := make([]color.Color,totalMinutes)
@@ -309,10 +282,7 @@ func drawSchedule() {
 	if flag.NArg() == 2 && flag.Arg(1) == "help" {
 		plotUsage()
 	}
-	statLength := statDayFromConfiguration()
-	toDay := schedule.GetTodayString()
-	startDay,_ := schedule.DayAddString(toDay,-statLength)
-	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	startDay,toDay := getDayPairFromCommand()
 	dayRange := RangeDay(startDay,toDay)
 	totalMinutes := len(dayRange)*MINUTES_IN_A_DAY
 	colorArray := make([]color.Color,totalMinutes)
@@ -336,10 +306,7 @@ func job() {
 	if flag.NArg() == 2 && flag.Arg(1) == "help" {
 		jobUsage()
 	}
-	statLength := statDayFromConfiguration()
-	toDay := schedule.GetTodayString()
-	startDay,_ := schedule.DayAddString(toDay,-statLength)
-	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	startDay,toDay := getDayPairFromCommand()
 	compilePatterns(settingGroups)
 	dayRange := RangeDay(startDay,toDay)
 	globalGroup := settingGroups["global"]
@@ -373,10 +340,7 @@ func jobstat() {
 	if flag.NArg() == 2 && flag.Arg(1) == "help" {
 		jobstatUsage()
 	}
-	statLength := statDayFromConfiguration()
-	toDay := schedule.GetTodayString()
-	startDay,_ := schedule.DayAddString(toDay,-statLength)
-	startDay,toDay = evalDayPairByCommand(startDay,toDay)
+	startDay,toDay := getDayPairFromCommand()
 	compilePatterns(settingGroups)
 	dayRange := RangeDay(startDay,toDay)
 	jobset := NewJobSet()
