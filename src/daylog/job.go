@@ -80,7 +80,10 @@ func (job *Job) DurationString() string {
 }
 
 func (job *Job) Print() {
-	fmt.Printf("  %-32s last time %s (%s ago), time spent %s\n",job.content,job.last,job.SinceString(),job.DurationString())
+	weekString,ok := schedule.GetDayWeekString(job.last)
+	fatalFalsef(ok,"Invalid last time: %s",job.last)
+	fmt.Printf("  %-32s last time %s (%s ago), time spent %s\n",
+		job.content,weekString,job.SinceString(),job.DurationString())
 }
 
 func (jobset *JobSet) Update(item *schedule.ScheduleItem) {
