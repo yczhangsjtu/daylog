@@ -7,6 +7,21 @@ import (
 	"path/filepath"
 )
 
+const (
+	DEFAULT_PATH string = "~/.daylog"
+	CONFIG_FILE = "config"
+	SETTING_FILE = "settings"
+	START_FILE = "start"
+)
+
+var verboseLevel int
+var verbose bool
+var colorScheme string
+var path string
+var startPath string
+
+var configuration map[string]string
+
 func setPath() {
 	path,ok = os.LookupEnv("DAYLOG_PATH")
 	if !ok {

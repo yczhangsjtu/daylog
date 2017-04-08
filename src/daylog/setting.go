@@ -18,6 +18,8 @@ type SettingGroup struct {
 	jobset *JobSet
 }
 
+var settingGroups map[string]*SettingGroup
+
 func NewSettingGroup(name string) (g *SettingGroup) {
 	g = &SettingGroup{name,name,"","",0,nil,nil}
 	g.jobset = NewJobSet()

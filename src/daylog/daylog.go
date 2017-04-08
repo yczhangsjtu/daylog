@@ -13,26 +13,11 @@ import (
 )
 
 const (
-	DEFAULT_PATH string = "~/.daylog"
-	CONFIG_FILE = "config"
-	SETTING_FILE = "settings"
-	START_FILE = "start"
-)
-
-const (
 	DEFAULT_STAT_DAY int = 7
 	MINUTES_IN_A_DAY = 1440
 )
 
-var verboseLevel int
-var verbose bool
-var colorScheme string
-var path string
-var startPath string
 var ok bool
-
-var configuration map[string]string
-var settingGroups map[string]*SettingGroup
 
 /**************
  * Operations *
