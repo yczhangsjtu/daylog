@@ -141,13 +141,17 @@ func (tasks *TaskSet) SerializedTasks() []*Task {
 		i += 1
 	}
 	sort.SliceStable(list,func (i,j int) bool {
+		if list[i].GetLevel() < list[j].GetLevel() {
+			return false
+		} else if list[i].GetLevel() > list[j].GetLevel() {
+			return true
+		}
 		if list[i].GetOrder() < list[j].GetOrder() {
 			return true
 		} else if list[i].GetOrder() > list[j].GetOrder() {
 			return false
-		} else {
-			return list[i].GetContent() < list[j].GetContent()
 		}
+		return list[i].GetContent() < list[j].GetContent()
 	})
 	return list
 }

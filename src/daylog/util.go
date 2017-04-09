@@ -376,3 +376,11 @@ func getDayPairFromCommand() (start,to string) {
 	startDay,toDay = evalDayPairByCommand(startDay,toDay)
 	return startDay,toDay
 }
+
+func getJobFromTask(content string) string {
+	ncontent,ok := tasks.GetTaskContent(content)
+	if ok {
+		return ncontent
+	}
+	return content
+}

@@ -54,7 +54,8 @@ func start() {
 	}
 	content,startTime := "",schedule.GetNowString()
 	if flag.NArg() > 1 {
-		content = flag.Arg(1)
+		readTasks()
+		content = getJobFromTask(flag.Arg(1))
 	}
 	if flag.NArg() > 2 {
 		startTime = ExpandTime(flag.Arg(2))
@@ -88,7 +89,8 @@ func restart() {
 		if istime {
 			startTime = possibleTime
 		} else {
-			content = flag.Arg(1)
+			readTasks()
+			content = getJobFromTask(flag.Arg(1))
 		}
 	}
 	startFile,err := ioutil.ReadFile(startPath)
