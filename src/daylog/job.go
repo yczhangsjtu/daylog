@@ -79,6 +79,20 @@ func (job *Job) DurationString() string {
 	return fmt.Sprintf("%dh%dm",job.duration/60,job.duration%60)
 }
 
+func (job *Job) GetColor() string {
+	since := job.Since()
+	switch {
+	case since < MINUTES_IN_A_DAY:
+		return "green"
+	case since < MINUTES_IN_A_DAY*3:
+		return "yellow"
+	case since < MINUTES_IN_A_DAY*5:
+		return "purple"
+	default:
+		return "red"
+	}
+}
+
 func (job *Job) Print() {
 	weekString,ok := schedule.GetDayWeekString(job.last)
 	fatalFalsef(ok,"Invalid last time: %s",job.last)

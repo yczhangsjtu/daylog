@@ -332,9 +332,9 @@ func job() {
 		printColorSchemeTail(colorScheme,group.color)
 		jobs := group.GetJobs()
 		for _,job := range jobs {
-			printColorSchemeHead(colorScheme,group.color)
+			printColorSchemeHead(colorScheme,job.GetColor())
 			job.Print()
-			printColorSchemeTail(colorScheme,group.color)
+			printColorSchemeTail(colorScheme,job.GetColor())
 		}
 	}
 }
