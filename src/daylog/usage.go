@@ -19,6 +19,7 @@ const (
 	DRAW_USAGE = "Usage: daylog [options] draw [help]|[startday [endday]]"
 	JOB_USAGE = "Usage: daylog [options] job [help]|[startday [endday]]"
 	JOBSTAT_USAGE = "Usage: daylog [options] jobstat [help]|[startday [endday]]"
+	TASK_USAGE = "Usage: daylog [options] task [help]|[set taskname level|content]"
 )
 
 func usage() {
@@ -37,6 +38,7 @@ func usage() {
 	fmt.Println("  draw    draw time usage")
 	fmt.Println("  job     show jobs present")
 	fmt.Println("  jobstat sort jobs by last time")
+	fmt.Println("  task    show tasks or set task attribuets")
 	os.Exit(0)
 }
 
@@ -92,5 +94,10 @@ func jobUsage() {
 
 func jobstatUsage() {
 	fmt.Println(JOBSTAT_USAGE)
+	os.Exit(0)
+}
+
+func taskUsage() {
+	fmt.Println(TASK_USAGE)
 	os.Exit(0)
 }

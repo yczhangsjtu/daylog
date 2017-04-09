@@ -4,6 +4,7 @@ import (
 	"os"
 	"flag"
 	"fmt"
+	"strconv"
 	"strings"
 	"schedule"
 	"path/filepath"
@@ -366,6 +367,54 @@ func jobstat() {
 	}
 }
 
+func task() {
+	readTasks()
+	if flag.NArg() == 4 && flag.Arg(1) == "set" {
+		setTask()
+	} else if flag.NArg() == 1 {
+		showTask()
+	} else {
+		taskUsage()
+	}
+}
+
+func setTask() {
+	name,value := flag.Arg(2),flag.Arg(3)
+	level,err := strconv.Atoi(value)
+	if err == nil {
+		fatalFalsef(tasks.SetTaskLevel(name,level),"Failed to set level of task %s",name)
+		content,_ := tasks.GetTaskContent(name)
+		fmt.Printf("Set task %s to level %d (%s)\n",name,level,content)
+	} else {
+		tasks.SetTaskContent(name,value)
+		fmt.Printf("Set task %s to: %s\n",name,value)
+	}
+	saveTasks()
+}
+
+func showTask() {
+	compilePatterns(settingGroups)
+	globalGroup := settingGroups["global"]
+	fatalTrue(tasks==nil,"Tasks not read!")
+	for name,task := range *tasks.GetTasks() {
+		content := task.GetContent()
+		group := getItemGroup(content,settingGroups)
+		if group == nil {
+			group = globalGroup
+		}
+		group.taskset.SetTask(name,task)
+	}
+	for _,group := range serializedSettingGroups(settingGroups) {
+		fmt.Printf("[%s]\n",group.label)
+		tasks := group.GetTasks()
+		for _,task := range tasks {
+			printColorSchemeHead(colorScheme,task.GetColor())
+			task.Print()
+			printColorSchemeTail(colorScheme,task.GetColor())
+		}
+	}
+}
+
 /********
  * main *
  ********/
@@ -405,6 +454,8 @@ func main() {
 		job()
 	} else if command == "jobstat" {
 		jobstat()
+	} else if command == "task" {
+		task()
 	} else {
 		usage()
 	}

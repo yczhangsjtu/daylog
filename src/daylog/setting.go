@@ -16,13 +16,15 @@ type SettingGroup struct {
 	minute int
 	compiled *regexp.Regexp
 	jobset *JobSet
+	taskset *TaskSet
 }
 
 var settingGroups map[string]*SettingGroup
 
 func NewSettingGroup(name string) (g *SettingGroup) {
-	g = &SettingGroup{name,name,"","",0,nil,nil}
+	g = &SettingGroup{name,name,"","",0,nil,nil,nil}
 	g.jobset = NewJobSet()
+	g.taskset = NewTaskSet()
 	return
 }
 
@@ -87,6 +89,10 @@ func (g *SettingGroup) Update(item *schedule.ScheduleItem) {
 
 func (g *SettingGroup) GetJobs() []*Job {
 	return g.jobset.GetJobs()
+}
+
+func (g *SettingGroup) GetTasks() []*Task {
+	return g.taskset.SerializedTasks()
 }
 
 func serializedSettingGroups(settingGroups map[string]*SettingGroup) (groups []*SettingGroup) {

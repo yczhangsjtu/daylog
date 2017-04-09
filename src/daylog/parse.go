@@ -2,6 +2,7 @@ package main
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -10,6 +11,7 @@ var specialPattern *regexp.Regexp = nil
 var commentPattern *regexp.Regexp = nil
 var labelPattern *regexp.Regexp = nil
 var groupPattern *regexp.Regexp = nil
+var taskPattern *regexp.Regexp = nil
 
 func parseKeyValue(s string) (key,value string) {
 	if keyvaluePattern == nil {
@@ -97,5 +99,25 @@ func parseComment(s string) (ret string) {
 		return ""
 	}
 	ret = strings.TrimSpace(groups[1])
+	return
+}
+
+func parseTask(s string) (name,content string,level int) {
+	if taskPattern == nil {
+		pattern,err := regexp.Compile("^\\s*(\\w+)\\s*,\\s*(\\d+)\\s*,\\s*([ -~]*)\\s*$")
+		fatalError("Error in parsing task regular expression",err)
+		taskPattern = pattern
+	}
+	if !taskPattern.MatchString(s) {
+		return "","",0
+	}
+	groups := taskPattern.FindStringSubmatch(s)
+	if len(groups) != 4 {
+		return "","",0
+	}
+	name = groups[1]
+	level,err := strconv.Atoi(groups[2])
+	fatalErrorf(err,"Invalid level '%s'",groups[2])
+	content = groups[3]
 	return
 }

@@ -12,6 +12,7 @@ const (
 	CONFIG_FILE = "config"
 	SETTING_FILE = "settings"
 	START_FILE = "start"
+	TASK_FILE = "task"
 )
 
 var verboseLevel int
@@ -21,6 +22,7 @@ var path string
 var startPath string
 
 var configuration map[string]string
+var tasks *TaskSet
 
 func setPath() {
 	path,ok = os.LookupEnv("DAYLOG_PATH")
@@ -92,6 +94,35 @@ func saveSetting() {
 	WriteFile(settingPath,settings)
 }
 
+func readTasks() {
+	tasks = NewTaskSet()
+
+	taskPath := filepath.Join(path,TASK_FILE)
+	Verbose(1,"Reading task file: %s\n",taskPath)
+	taskLines,ok := SplitFileByLine(taskPath)
+	if !ok {
+		return
+	}
+	for i,t := range taskLines {
+		line := parseComment(t)
+		if line == "" {
+			continue
+		}
+		task := NewTaskFromString(line)
+		task.SetOrder(i)
+		tasks.SetTask(task.name,task)
+	}
+}
+
+func saveTasks() {
+	taskPath := filepath.Join(path,TASK_FILE)
+	taskLines := ""
+	for _,task := range tasks.SerializedTasks() {
+		taskLines += task.String()+"\n"
+	}
+	WriteFile(taskPath,taskLines)
+}
+
 func parseGlobalOptions() {
 	flag.IntVar(&verboseLevel,"verbose",0,"Verbose level")
 	flag.BoolVar(&verbose,"v",false,"Verbose")
@@ -106,4 +137,3 @@ func parseGlobalOptions() {
 		verboseLevel = 1
 	}
 }
-
